@@ -38,7 +38,7 @@ $_SESSION['username'] = $user['username'];
 $_SESSION['role'] = $user['role'];
 
 $pdo->prepare('UPDATE users SET last_activity = NOW() WHERE id = ?')->execute([$user['id']]);
-$pdo->prepare('INSERT INTO audit_log (user_id, username, action, table_name) VALUES (?, ?, ?, ?)')->execute([$user['id'], $user['username'], 'login', null]);
+$pdo->prepare('INSERT INTO audit_log (user_id, username, action, table_name) VALUES (?, ?, ?, ?)')->execute([$user['id'], $user['username'], 'login', 'users']);
 pruneAuditLogTable($pdo);
 
 echo json_encode([

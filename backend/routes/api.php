@@ -11,12 +11,13 @@ use DarLogs\Controllers\DashboardController;
 use DarLogs\Middleware\AuthMiddleware;
 use DarLogs\Middleware\AdminMiddleware;
 use DarLogs\Middleware\CorsMiddleware;
+use DarLogs\Middleware\RateLimitMiddleware;
 
 return function (Router $router): void {
     $router->addGlobalMiddleware(new CorsMiddleware());
 
-    // Public
-    $router->post('/api/v1/auth/login',    [AuthController::class, 'login']);
+    // Public — rate-limited
+    $router->post('/api/v1/auth/login',    [AuthController::class, 'login'],    [new RateLimitMiddleware(10, 60)]);
     $router->post('/api/v1/auth/register', [AuthController::class, 'register']);
 
     // Activities — literal routes before parameterized routes
@@ -53,4 +54,7 @@ return function (Router $router): void {
     // References
     $router->get('/api/v1/references/municipalities', [DashboardController::class, 'municipalities'], [new AuthMiddleware()]);
     $router->get('/api/v1/references/users',          [DashboardController::class, 'routeUsers'],     [new AuthMiddleware()]);
+
+    // Health check
+    $router->get('/api/v1/health', [DashboardController::class, 'health']);
 };

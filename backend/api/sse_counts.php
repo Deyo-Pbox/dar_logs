@@ -30,6 +30,9 @@ while (ob_get_level()) {
 flush();
 
 function getNotifData(PDO $pdo, int $userId): array {
+    $cacheKey = 'sse_notif_' . $userId;
+    $cached = darCacheGet($cacheKey, null);
+
     $stmt = $pdo->prepare(
         "SELECT n.id, n.message, n.record_id, u.username AS sender_name
            FROM notifications n
@@ -45,10 +48,23 @@ function getNotifData(PDO $pdo, int $userId): array {
     $countStmt->execute([$userId]);
     $count = (int) $countStmt->fetchColumn();
 
-    return ['count' => $count, 'newest' => $newest];
+    $result = ['count' => $count, 'newest' => $newest];
+
+    // Only re-cache if the count changed (new notification arrived)
+    if ($cached === null || ($cached['count'] ?? -1) !== $count) {
+        darCacheSet($cacheKey, $result, 10);
+    }
+
+    return $result;
 }
 
 function getPendingCount(PDO $pdo, int $userId, bool $isAdmin): int {
+    $cacheKey = 'sse_pending_' . ($isAdmin ? 'all' : $userId);
+    $cached = darCacheGet($cacheKey, null);
+    if ($cached !== null) {
+        return (int) $cached;
+    }
+
     if ($isAdmin) {
         $stmt = $pdo->query(
             "SELECT COUNT(*) FROM activity_logs
@@ -63,7 +79,9 @@ function getPendingCount(PDO $pdo, int $userId, bool $isAdmin): int {
         );
         $stmt->execute([$userId]);
     }
-    return (int) $stmt->fetchColumn();
+    $count = (int) $stmt->fetchColumn();
+    darCacheSet($cacheKey, $count, 15);
+    return $count;
 }
 
 $pdo          = getDB();

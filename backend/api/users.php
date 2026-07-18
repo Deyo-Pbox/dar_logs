@@ -12,7 +12,7 @@ $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
-    $stmt = $pdo->query('SELECT id, username, password, role, approved, created_at, last_activity FROM users ORDER BY id');
+    $stmt = $pdo->query('SELECT id, username, role, approved, created_at, last_activity FROM users ORDER BY id');
     $rows = $stmt->fetchAll();
     echo json_encode(['success' => true, 'data' => $rows]);
     exit;
@@ -37,7 +37,7 @@ if ($method === 'POST') {
         echo json_encode(['success' => false, 'message' => 'Username already taken']);
         exit;
     }
-    $hash = password_hash($password, PASSWORD_DEFAULT);
+    $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
     $pdo->prepare('INSERT INTO users (username, password, role, approved) VALUES (?, ?, ?, 1)')->execute([$username, $hash, $role]);
     echo json_encode(['success' => true, 'message' => 'Account created', 'id' => (int) $pdo->lastInsertId()]);
     exit;
@@ -78,7 +78,7 @@ if ($method === 'PATCH') {
             exit;
         }
         $updates[] = 'password = ?';
-        $params[] = password_hash($password, PASSWORD_DEFAULT);
+        $params[] = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
     }
     $role = $input['role'] ?? null;
     if ($role !== null && in_array($role, ['admin', 'user'], true)) {

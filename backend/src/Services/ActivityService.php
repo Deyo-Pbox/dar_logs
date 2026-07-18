@@ -65,53 +65,63 @@ class ActivityService
 
     public function create(array $data, object $currentUser): int
     {
-        $routeToUserId = (int) ($data['route_to_user_id'] ?? 0);
-        $routeToUserName = '';
+        $pdo = Database::getInstance();
+        $pdo->beginTransaction();
 
-        if ($routeToUserId > 0) {
-            $target = $this->userRepo->findById($routeToUserId);
-            if ($target !== null && $target->approved) {
-                $routeToUserName = $target->username;
-            } else {
-                $routeToUserId = 0;
+        try {
+            $routeToUserId = (int) ($data['route_to_user_id'] ?? 0);
+            $routeToUserName = '';
+
+            if ($routeToUserId > 0) {
+                $target = $this->userRepo->findById($routeToUserId);
+                if ($target !== null && $target->approved) {
+                    $routeToUserName = $target->username;
+                } else {
+                    $routeToUserId = 0;
+                }
             }
+
+            $fields = [
+                'municipality'           => $data['municipality'],
+                'lo_claimant'            => $data['lo_claimant'],
+                'title_no'               => $data['title_no'],
+                'odts_no'                => $data['odts_no'],
+                'lot_no'                 => $data['lot_no'],
+                'survey_no'              => $data['survey_no'],
+                'area_has'               => $data['area_has'],
+                'location'               => $data['location'],
+                'transmitted_documents'  => $data['transmitted_documents'],
+                'route_to'               => $routeToUserName !== '' ? $routeToUserName : $data['route_to'],
+                'route_to_user_id'       => $routeToUserId > 0 ? $routeToUserId : null,
+                'routed_from_user_id'    => $routeToUserId > 0 ? $currentUser->id : null,
+                'routed_at'              => $routeToUserId > 0 ? date('Y-m-d H:i:s') : null,
+                'received_by_control_no' => $data['received_by_control_no'],
+                'remarks_action_taken'   => $data['remarks_action_taken'],
+                'work_status'            => $data['work_status'],
+                'created_by'             => $currentUser->id,
+                'updated_by'             => $currentUser->id,
+            ];
+
+            $id = $this->activityRepo->create($fields);
+
+            $this->auditRepo->log($currentUser->id, $currentUser->username, 'add', 'activity_logs', $id, 'Record created');
+            $this->auditRepo->prune((int) AppConfig::get('AUDIT_LOG_CAPACITY', 100));
+
+            if ($routeToUserId > 0) {
+                $this->notifRepo->create(
+                    $routeToUserId, 'route', $id, $currentUser->id,
+                    'Record routed from ' . $currentUser->username . '.'
+                );
+                $this->notifRepo->trimForUser($routeToUserId, (int) AppConfig::get('NOTIFICATION_CAP', 50));
+            }
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
         }
 
-        $fields = [
-            'municipality'           => $data['municipality'],
-            'lo_claimant'            => $data['lo_claimant'],
-            'title_no'               => $data['title_no'],
-            'odts_no'                => $data['odts_no'],
-            'lot_no'                 => $data['lot_no'],
-            'survey_no'              => $data['survey_no'],
-            'area_has'               => $data['area_has'],
-            'location'               => $data['location'],
-            'transmitted_documents'  => $data['transmitted_documents'],
-            'route_to'               => $routeToUserName !== '' ? $routeToUserName : $data['route_to'],
-            'route_to_user_id'       => $routeToUserId > 0 ? $routeToUserId : null,
-            'routed_from_user_id'    => $routeToUserId > 0 ? $currentUser->id : null,
-            'routed_at'              => $routeToUserId > 0 ? date('Y-m-d H:i:s') : null,
-            'received_by_control_no' => $data['received_by_control_no'],
-            'remarks_action_taken'   => $data['remarks_action_taken'],
-            'work_status'            => $data['work_status'],
-            'created_by'             => $currentUser->id,
-            'updated_by'             => $currentUser->id,
-        ];
-
-        $id = $this->activityRepo->create($fields);
-
-        $this->auditRepo->log($currentUser->id, $currentUser->username, 'add', 'activity_logs', $id, 'Record created');
-        $this->auditRepo->prune((int) AppConfig::get('AUDIT_LOG_CAPACITY', 100));
         $this->invalidateStats();
-
-        if ($routeToUserId > 0) {
-            $this->notifRepo->create(
-                $routeToUserId, 'route', $id, $currentUser->id,
-                'Record routed from ' . $currentUser->username . '.'
-            );
-            $this->notifRepo->trimForUser($routeToUserId, (int) AppConfig::get('NOTIFICATION_CAP', 50));
-        }
-
         return $id;
     }
 
@@ -159,19 +169,30 @@ class ActivityService
         $prevRouteToUserId = $record->routeToUserId ?? 0;
         $routeChanged = $routeToUserId > 0 && $routeToUserId !== $prevRouteToUserId;
 
-        $this->activityRepo->update($id, $fields);
+        $pdo = Database::getInstance();
+        $pdo->beginTransaction();
 
-        $this->auditRepo->log($currentUser->id, $currentUser->username, 'edit', 'activity_logs', $id, 'Record updated');
-        $this->auditRepo->prune((int) AppConfig::get('AUDIT_LOG_CAPACITY', 100));
-        $this->invalidateStats();
+        try {
+            $this->activityRepo->update($id, $fields);
 
-        if ($routeChanged) {
-            $this->notifRepo->create(
-                $routeToUserId, 'route', $id, $currentUser->id,
-                'Record routed from ' . $currentUser->username . '.'
-            );
-            $this->notifRepo->trimForUser($routeToUserId, (int) AppConfig::get('NOTIFICATION_CAP', 50));
+            $this->auditRepo->log($currentUser->id, $currentUser->username, 'edit', 'activity_logs', $id, 'Record updated');
+            $this->auditRepo->prune((int) AppConfig::get('AUDIT_LOG_CAPACITY', 100));
+
+            if ($routeChanged) {
+                $this->notifRepo->create(
+                    $routeToUserId, 'route', $id, $currentUser->id,
+                    'Record routed from ' . $currentUser->username . '.'
+                );
+                $this->notifRepo->trimForUser($routeToUserId, (int) AppConfig::get('NOTIFICATION_CAP', 50));
+            }
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
         }
+
+        $this->invalidateStats();
     }
 
     public function archive(int $id, object $currentUser): void

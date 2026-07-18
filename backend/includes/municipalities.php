@@ -1,95 +1,79 @@
 <?php
 /**
  * DAR Activity Logs - Shared municipality list and validation helpers
+ *
+ * Delegates to DarLogs\Helpers\Municipalities when Composer autoload is available,
+ * falls back to inline definitions otherwise.
  */
 
-function darMunicipalityList(): array {
-    return [
-        'BOMBON',
-        'CALABANGA',
-        'CANAMAN',
-        'MAGARAO',
-        'NAGA',
-        'OCAMPO',
-        'PILI',
-        'CARAMOAN',
-        'GARCHITORENA',
-        'GOA',
-        'LAGONOY',
-        'PRESENTACION',
-        'SANJOSE',
-        'SAGÑAY',
-        'SIRUMA',
-        'TIGAON',
-        'TINAMBAC',
-    ];
-}
-
-/**
- * Canonical municipality codes with human-readable labels, A–Z for dashboard filter chips.
- * Values must match darMunicipalityList() (database / form values).
- */
-function darMunicipalityFilterCatalog(): array {
-    return [
-        ['value' => 'BOMBON', 'label' => 'Bombon'],
-        ['value' => 'CALABANGA', 'label' => 'Calabanga'],
-        ['value' => 'CANAMAN', 'label' => 'Canaman'],
-        ['value' => 'CARAMOAN', 'label' => 'Caramoan'],
-        ['value' => 'GARCHITORENA', 'label' => 'Garchitorena'],
-        ['value' => 'GOA', 'label' => 'Goa'],
-        ['value' => 'LAGONOY', 'label' => 'Lagonoy'],
-        ['value' => 'MAGARAO', 'label' => 'Magarao'],
-        ['value' => 'NAGA', 'label' => 'Naga'],
-        ['value' => 'OCAMPO', 'label' => 'Ocampo'],
-        ['value' => 'PILI', 'label' => 'Pili'],
-        ['value' => 'PRESENTACION', 'label' => 'Presentacion'],
-        ['value' => 'SAGÑAY', 'label' => 'Sagñay'],
-        ['value' => 'SANJOSE', 'label' => 'San Jose'],
-        ['value' => 'SIRUMA', 'label' => 'Siruma'],
-        ['value' => 'TIGAON', 'label' => 'Tigaon'],
-        ['value' => 'TINAMBAC', 'label' => 'Tinambac'],
-    ];
-}
-
-function darNormalizeMunicipalityKey(?string $value): ?string {
-    if ($value === null) {
-        return null;
+if (class_exists(\DarLogs\Helpers\Municipalities::class, false)) {
+    function darMunicipalityList(): array {
+        return \DarLogs\Helpers\Municipalities::list();
     }
 
-    $value = trim($value);
-    if ($value === '') {
-        return null;
+    function darMunicipalityFilterCatalog(): array {
+        return \DarLogs\Helpers\Municipalities::filterCatalog();
     }
 
-    $value = preg_replace('/\s+/u', '', $value);
-    if ($value === null || $value === '') {
-        return null;
+    function darNormalizeMunicipalityKey(?string $value): ?string {
+        return \DarLogs\Helpers\Municipalities::validate($value);
     }
 
-    return function_exists('mb_strtoupper')
-        ? mb_strtoupper($value, 'UTF-8')
-        : strtoupper($value);
-}
-
-function normalizeMunicipalityInput(?string $value): ?string {
-    $key = darNormalizeMunicipalityKey($value);
-    if ($key === null) {
-        return null;
+    function normalizeMunicipalityInput(?string $value): ?string {
+        return \DarLogs\Helpers\Municipalities::validate($value);
     }
 
-    foreach (darMunicipalityList() as $municipality) {
-        if ($key === darNormalizeMunicipalityKey($municipality)) {
-            return $municipality;
+    function renderMunicipalityOptions(?string $selected = null): void {
+        $selectedKey = darNormalizeMunicipalityKey($selected);
+        foreach (darMunicipalityList() as $municipality) {
+            $isSelected = $selectedKey !== null && $selectedKey === darNormalizeMunicipalityKey($municipality);
+            echo '<option value="' . htmlspecialchars($municipality, ENT_QUOTES, 'UTF-8') . '"' . ($isSelected ? ' selected' : '') . '>' . htmlspecialchars($municipality, ENT_QUOTES, 'UTF-8') . '</option>';
         }
     }
+} else {
+    // Fallback inline when Composer autoload is not available
+    function darMunicipalityList(): array {
+        return [
+            'BOMBON', 'CALABANGA', 'CANAMAN', 'MAGARAO', 'NAGA', 'OCAMPO', 'PILI',
+            'CARAMOAN', 'GARCHITORENA', 'GOA', 'LAGONOY', 'PRESENTACION', 'SANJOSE',
+            'SAGÑAY', 'SIRUMA', 'TIGAON', 'TINAMBAC',
+        ];
+    }
 
-    return null;
-}
+    function darMunicipalityFilterCatalog(): array {
+        $labels = [
+            'BOMBON' => 'Bombon', 'CALABANGA' => 'Calabanga', 'CANAMAN' => 'Canaman',
+            'CARAMOAN' => 'Caramoan', 'GARCHITORENA' => 'Garchitorena', 'GOA' => 'Goa',
+            'LAGONOY' => 'Lagonoy', 'MAGARAO' => 'Magarao', 'NAGA' => 'Naga',
+            'OCAMPO' => 'Ocampo', 'PILI' => 'Pili', 'PRESENTACION' => 'Presentacion',
+            'SAGÑAY' => 'Sagñay', 'SANJOSE' => 'San Jose', 'SIRUMA' => 'Siruma',
+            'TIGAON' => 'Tigaon', 'TINAMBAC' => 'Tinambac',
+        ];
+        asort($labels);
+        return array_map(fn($v) => ['value' => $v, 'label' => $labels[$v]], array_keys($labels));
+    }
 
-function renderMunicipalityOptions(?string $selected = null): void {
-    $selectedKey = darNormalizeMunicipalityKey($selected);
-    foreach (darMunicipalityList() as $municipality) {
-        $isSelected = $selectedKey !== null && $selectedKey === darNormalizeMunicipalityKey($municipality);
-        echo '<option value="' . htmlspecialchars($municipality, ENT_QUOTES, 'UTF-8') . '"' . ($isSelected ? ' selected' : '') . '>' . htmlspecialchars($municipality, ENT_QUOTES, 'UTF-8') . '</option>';
+    function darNormalizeMunicipalityKey(?string $value): ?string {
+        if ($value === null || trim($value) === '') return null;
+        $value = preg_replace('/\s+/u', '', trim($value));
+        if ($value === null || $value === '') return null;
+        return function_exists('mb_strtoupper') ? mb_strtoupper($value, 'UTF-8') : strtoupper($value);
+    }
+
+    function normalizeMunicipalityInput(?string $value): ?string {
+        $key = darNormalizeMunicipalityKey($value);
+        if ($key === null) return null;
+        foreach (darMunicipalityList() as $m) {
+            if ($key === darNormalizeMunicipalityKey($m)) return $m;
+        }
+        return null;
+    }
+
+    function renderMunicipalityOptions(?string $selected = null): void {
+        $selectedKey = darNormalizeMunicipalityKey($selected);
+        foreach (darMunicipalityList() as $municipality) {
+            $isSelected = $selectedKey !== null && $selectedKey === darNormalizeMunicipalityKey($municipality);
+            echo '<option value="' . htmlspecialchars($municipality, ENT_QUOTES, 'UTF-8') . '"' . ($isSelected ? ' selected' : '') . '>' . htmlspecialchars($municipality, ENT_QUOTES, 'UTF-8') . '</option>';
+        }
     }
 }

@@ -6,7 +6,7 @@ namespace DarLogs\Controllers;
 
 use DarLogs\Core\Request;
 use DarLogs\Core\Response;
-use DarLogs\Core\Cache;
+use DarLogs\Core\Database;
 use DarLogs\Helpers\Municipalities;
 use DarLogs\Services\ActivityService;
 use DarLogs\Services\UserService;
@@ -50,5 +50,22 @@ class DashboardController
     public function routeUsers(Request $request): Response
     {
         return Response::ok(['data' => $this->userService->listApproved()]);
+    }
+
+    public function health(Request $request): Response
+    {
+        $dbStatus = false;
+        try {
+            Database::getInstance()->query('SELECT 1');
+            $dbStatus = true;
+        } catch (\Throwable) {
+            // DB is down
+        }
+
+        return Response::ok([
+            'status'    => $dbStatus ? 'healthy' : 'degraded',
+            'timestamp' => date('c'),
+            'database'  => $dbStatus ? 'connected' : 'disconnected',
+        ]);
     }
 }

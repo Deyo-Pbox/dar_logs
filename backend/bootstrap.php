@@ -25,12 +25,15 @@ set_exception_handler(function (Throwable $e): void {
         $message = $e->getMessage();
         $errors = ($e instanceof ValidationException) ? $e->getErrors() : null;
     } elseif ($e instanceof \PDOException) {
-        error_log('PDOException: ' . $e->getMessage());
+        \DarLogs\Core\Logger::error('Database error', ['error' => $e->getMessage()]);
         $status = 500;
         $message = AppConfig::isDebug() ? $e->getMessage() : 'Database error';
         $errors = null;
     } else {
-        error_log(get_class($e) . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+        \DarLogs\Core\Logger::error(get_class($e) . ': ' . $e->getMessage(), [
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+        ]);
         $status = 500;
         $message = AppConfig::isDebug() ? $e->getMessage() : 'Internal server error';
         $errors = null;
@@ -50,3 +53,4 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
 
 \DarLogs\Core\Cache::init($basePath . '/storage/cache');
+\DarLogs\Core\Logger::init($basePath . '/storage/logs');

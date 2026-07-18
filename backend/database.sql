@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   KEY `idx_users_approved_active` (`approved`, `last_activity`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Default admin (password: password; run scripts/create_admin.php for admin123)
+-- Default admin for initial development (password: password — CHANGE IMMEDIATELY in production)
 INSERT INTO `users` (`username`, `password`, `role`, `approved`) VALUES
 ('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', 1);
 

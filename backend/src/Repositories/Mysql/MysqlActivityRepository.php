@@ -268,19 +268,30 @@ class MysqlActivityRepository implements ActivityRepository
     {
         $row = $this->pdo->query(
             'SELECT
-                (SELECT COUNT(*) FROM activity_logs WHERE archived_at IS NULL) AS total_records,
-                (SELECT COUNT(*) FROM activity_logs WHERE archived_at IS NOT NULL) AS archived_records,
-                (SELECT COUNT(*) FROM users) AS total_users,
-                (SELECT COUNT(*) FROM audit_log WHERE action IN (\'add\',\'edit\',\'delete\',\'archive\',\'restore\') AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS recent_edits,
-                (SELECT COUNT(*) FROM users WHERE last_activity >= DATE_SUB(NOW(), INTERVAL 15 MINUTE) AND approved = 1) AS active_users'
+                COALESCE(SUM(archived_at IS NULL), 0) AS total_records,
+                COALESCE(SUM(archived_at IS NOT NULL), 0) AS archived_records
+            FROM activity_logs'
         )->fetch();
+
+        $userStats = $this->pdo->query(
+            'SELECT
+                COUNT(*) AS total_users,
+                SUM(last_activity >= DATE_SUB(NOW(), INTERVAL 15 MINUTE) AND approved = 1) AS active_users
+            FROM users'
+        )->fetch();
+
+        $editCount = $this->pdo->query(
+            "SELECT COUNT(*) FROM audit_log
+            WHERE action IN ('add','edit','delete','archive','restore')
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)"
+        )->fetchColumn();
 
         return [
             'total_records'    => (int) $row['total_records'],
             'archived_records' => (int) $row['archived_records'],
-            'total_users'      => (int) $row['total_users'],
-            'recent_edits'     => (int) $row['recent_edits'],
-            'active_users'     => (int) $row['active_users'],
+            'total_users'      => (int) $userStats['total_users'],
+            'recent_edits'     => (int) $editCount,
+            'active_users'     => (int) $userStats['active_users'],
         ];
     }
 
@@ -288,6 +299,12 @@ class MysqlActivityRepository implements ActivityRepository
     {
         static $checked = false;
         if ($checked) return;
+
+        $stampPath = __DIR__ . '/../../../storage/schema_checked_activity_logs';
+        if (file_exists($stampPath) && filemtime($stampPath) > time() - 3600) {
+            $checked = true;
+            return;
+        }
         $checked = true;
 
         $migrations = [
@@ -300,14 +317,45 @@ class MysqlActivityRepository implements ActivityRepository
             ['name' => 'routed_at', 'sql' => 'ALTER TABLE activity_logs ADD COLUMN routed_at DATETIME NULL AFTER routed_from_user_id'],
         ];
 
+        $anyMissing = false;
         foreach ($migrations as $migration) {
             $s = $this->pdo->query("SHOW COLUMNS FROM activity_logs LIKE '{$migration['name']}'");
             if (!($s && $s->fetch())) {
-                $this->pdo->exec($migration['sql']);
+                $anyMissing = true;
+                break;
             }
         }
 
-        $this->ensureIndexes();
+        if (!$anyMissing) {
+            $indexColumns = $this->pdo->query('SHOW INDEX FROM activity_logs')->fetchAll();
+            $existingIndexes = [];
+            foreach ($indexColumns as $row) {
+                $existingIndexes[$row['Key_name']] = true;
+            }
+            $requiredIndexes = ['idx_al_work_status', 'idx_al_municipality', 'idx_al_created_at',
+                'idx_al_updated_at', 'idx_al_not_archived', 'idx_al_not_archived_created',
+                'idx_al_user_scope', 'idx_al_municipality_archived', 'idx_al_lo_claimant',
+                'idx_al_search', 'idx_al_ft_search'];
+            $anyMissing = false;
+            foreach ($requiredIndexes as $idx) {
+                if (!isset($existingIndexes[$idx])) {
+                    $anyMissing = true;
+                    break;
+                }
+            }
+        }
+
+        if ($anyMissing) {
+            foreach ($migrations as $migration) {
+                $s = $this->pdo->query("SHOW COLUMNS FROM activity_logs LIKE '{$migration['name']}'");
+                if (!($s && $s->fetch())) {
+                    $this->pdo->exec($migration['sql']);
+                }
+            }
+            $this->ensureIndexes();
+        }
+
+        @touch($stampPath);
     }
 
     private function ensureIndexes(): void
