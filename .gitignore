@@ -2,8 +2,9 @@
 backend/vendor/
 frontend/node_modules/
 
-# Build outputs
-backend/public/assets/
+# Build outputs (JS/CSS bundles only, images are tracked)
+backend/public/assets/*.js
+backend/public/assets/*.css
 
 # Environment
 backend/.env
