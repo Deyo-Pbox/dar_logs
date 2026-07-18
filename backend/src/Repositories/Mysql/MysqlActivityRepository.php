@@ -46,9 +46,15 @@ class MysqlActivityRepository implements ActivityRepository
             $params[] = $filters['work_status'];
         }
         if (!empty($filters['search'])) {
-            $where[] = '(al.lo_claimant LIKE ? OR al.title_no LIKE ? OR al.lot_no LIKE ? OR al.received_by_control_no LIKE ?)';
-            $s = '%' . $filters['search'] . '%';
-            $params = array_merge($params, [$s, $s, $s, $s]);
+            $term = trim($filters['search']);
+            if (mb_strlen($term) >= 4) {
+                $where[] = 'MATCH(al.lo_claimant, al.title_no, al.lot_no, al.received_by_control_no) AGAINST(? IN BOOLEAN MODE)';
+                $params[] = $term;
+            } else {
+                $where[] = '(al.lo_claimant LIKE ? OR al.title_no LIKE ? OR al.lot_no LIKE ? OR al.received_by_control_no LIKE ?)';
+                $s = '%' . $term . '%';
+                $params = array_merge($params, [$s, $s, $s, $s]);
+            }
         }
         if (!empty($filters['user_id'])) {
             $where[] = '(al.created_by = ? OR al.route_to_user_id = ?)';
@@ -80,9 +86,15 @@ class MysqlActivityRepository implements ActivityRepository
             $params[] = $filters['work_status'];
         }
         if (!empty($filters['search'])) {
-            $where[] = '(al.lo_claimant LIKE ? OR al.title_no LIKE ? OR al.lot_no LIKE ?)';
-            $s = '%' . $filters['search'] . '%';
-            $params = array_merge($params, [$s, $s, $s]);
+            $term = trim($filters['search']);
+            if (mb_strlen($term) >= 4) {
+                $where[] = 'MATCH(al.lo_claimant, al.title_no, al.lot_no) AGAINST(? IN BOOLEAN MODE)';
+                $params[] = $term;
+            } else {
+                $where[] = '(al.lo_claimant LIKE ? OR al.title_no LIKE ? OR al.lot_no LIKE ?)';
+                $s = '%' . $term . '%';
+                $params = array_merge($params, [$s, $s, $s]);
+            }
         }
         if (!empty($filters['user_id'])) {
             $where[] = '(al.created_by = ? OR al.route_to_user_id = ?)';
@@ -317,6 +329,7 @@ class MysqlActivityRepository implements ActivityRepository
             'idx_al_municipality_archived'=> 'ALTER TABLE activity_logs ADD INDEX idx_al_municipality_archived (municipality, archived_at)',
             'idx_al_lo_claimant'          => 'ALTER TABLE activity_logs ADD INDEX idx_al_lo_claimant (lo_claimant(64))',
             'idx_al_search'               => 'ALTER TABLE activity_logs ADD INDEX idx_al_search (lo_claimant(64), title_no, lot_no, received_by_control_no(64))',
+            'idx_al_ft_search'            => 'ALTER TABLE activity_logs ADD FULLTEXT INDEX idx_al_ft_search (lo_claimant, title_no, lot_no, received_by_control_no)',
         ];
 
         foreach ($indexes as $name => $sql) {

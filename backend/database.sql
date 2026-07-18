@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS `activity_logs` (
   KEY `idx_al_municipality_archived` (`municipality`, `archived_at`),
   KEY `idx_al_lo_claimant` (`lo_claimant`(64)),
   KEY `idx_al_search` (`lo_claimant`(64), `title_no`, `lot_no`, `received_by_control_no`(64)),
+  FULLTEXT KEY `idx_al_ft_search` (`lo_claimant`, `title_no`, `lot_no`, `received_by_control_no`),
   CONSTRAINT `activity_logs_archived_by` FOREIGN KEY (`archived_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `activity_logs_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `activity_logs_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
@@ -95,6 +96,7 @@ CREATE TABLE IF NOT EXISTS `audit_log` (
   KEY `action` (`action`),
   KEY `created_at` (`created_at`),
   KEY `idx_audit_recent_actions` (`created_at`, `action`),
+  KEY `idx_audit_record_id` (`record_id`),
   CONSTRAINT `audit_log_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -117,6 +119,7 @@ CREATE TABLE IF NOT EXISTS `notifications` (
   KEY `idx_notif_record_id` (`record_id`),
   KEY `idx_notif_unread` (`user_id`, `is_read`),
   KEY `idx_notif_user_latest` (`user_id`, `created_at`),
+  KEY `idx_notif_sender_id` (`sender_id`),
   CONSTRAINT `notifications_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `notifications_sender_id` FOREIGN KEY (`sender_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `notifications_record_id` FOREIGN KEY (`record_id`) REFERENCES `activity_logs` (`id`) ON DELETE SET NULL

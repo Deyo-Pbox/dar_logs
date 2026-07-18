@@ -94,6 +94,7 @@ class MysqlNotificationRepository implements NotificationRepository
             KEY idx_notif_record_id (record_id),
             KEY idx_notif_unread (user_id, is_read),
             KEY idx_notif_user_latest (user_id, created_at),
+            KEY idx_notif_sender_id (sender_id),
             CONSTRAINT notifications_user_id FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
             CONSTRAINT notifications_sender_id FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE SET NULL,
             CONSTRAINT notifications_record_id FOREIGN KEY (record_id) REFERENCES activity_logs (id) ON DELETE SET NULL
@@ -111,6 +112,7 @@ class MysqlNotificationRepository implements NotificationRepository
         }
 
         $indexes = [
+            'idx_notif_sender_id'    => 'ALTER TABLE notifications ADD INDEX idx_notif_sender_id (sender_id)',
             'idx_notif_unread'       => 'ALTER TABLE notifications ADD INDEX idx_notif_unread (user_id, is_read)',
             'idx_notif_user_latest'  => 'ALTER TABLE notifications ADD INDEX idx_notif_user_latest (user_id, created_at)',
         ];

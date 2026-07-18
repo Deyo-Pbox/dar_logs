@@ -4,7 +4,7 @@
  */
 
 /** Maximum rows stored in audit_log; oldest rows are deleted when this is exceeded. */
-define('AUDIT_LOG_CAPACITY', 10);
+define('AUDIT_LOG_CAPACITY', 100);
 
 function ensureAuditLogSchema(PDO $pdo): void {
     static $checked = false;
@@ -39,6 +39,10 @@ function ensureAuditLogIndexes(PDO $pdo): void
 
     if (!isset($existing['idx_audit_recent_actions'])) {
         $pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_recent_actions (created_at, action)');
+    }
+
+    if (!isset($existing['idx_audit_record_id'])) {
+        $pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_record_id (record_id)');
     }
 }
 

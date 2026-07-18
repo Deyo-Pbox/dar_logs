@@ -83,6 +83,10 @@ class MysqlAuditRepository implements AuditRepository
         if (!isset($existing['idx_audit_recent_actions'])) {
             $this->pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_recent_actions (created_at, action)');
         }
+
+        if (!isset($existing['idx_audit_record_id'])) {
+            $this->pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_record_id (record_id)');
+        }
     }
 
     private function hydrate(array $row): AuditLog
