@@ -2,10 +2,19 @@ package com.example.darlogs.data
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.example.darlogs.ui.RecordItem
 
-@Entity(tableName = "activity_logs")
+@Entity(
+    tableName = "activity_logs",
+    indices = [
+        Index(value = ["syncStatus"]),
+        Index(value = ["isArchived"]),
+        Index(value = ["municipality"]),
+        Index(value = ["id"])
+    ]
+)
 data class RecordEntity(
     @PrimaryKey(autoGenerate = true) val localId: Long = 0,
     val id: Int? = null, // Matches MySQL column name 'id'

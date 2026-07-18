@@ -1,9 +1,13 @@
 package com.example.darlogs.data
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "notifications")
+@Entity(
+    tableName = "notifications",
+    indices = [Index(value = ["is_read"])]
+)
 data class NotificationEntity(
     @PrimaryKey val id: Int,
     val user_id: Int,

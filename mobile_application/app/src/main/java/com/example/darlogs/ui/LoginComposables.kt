@@ -5,8 +5,12 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Visibility
@@ -23,6 +27,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -30,10 +35,6 @@ import androidx.compose.ui.unit.sp
 import com.example.darlogs.R
 import com.example.darlogs.ui.theme.*
 import java.util.*
-
-import androidx.compose.ui.viewinterop.AndroidView
-import android.webkit.WebView
-import android.webkit.WebViewClient
 
 @Composable
 fun LoginScreen(
@@ -44,25 +45,14 @@ fun LoginScreen(
     onBiometricLogin: () -> Unit,
     isBiometricAvailable: Boolean
 ) {
-    // Hidden WebView to bypass InfinityFree AES
-    AndroidView(
-        factory = { context ->
-            WebView(context).apply {
-                settings.javaScriptEnabled = true
-                webViewClient = WebViewClient()
-                // Use the same User-Agent as ApiClient
-                settings.userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                loadUrl("https://darlogs.freedev.app/")
-            }
-        },
-        modifier = Modifier.size(0.dp) // Invisible
-    )
-
     var username by remember { mutableStateOf(lastUsername) }
     var password by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
+    var usernameError by remember { mutableStateOf<String?>(null) }
+    var passwordError by remember { mutableStateOf<String?>(null) }
     val focusManager = LocalFocusManager.current
-    
+    val hasRememberedUsername = lastUsername.isNotEmpty()
+
     val greeting = remember {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         when (hour) {
@@ -92,6 +82,7 @@ fun LoginScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 30.dp)
+                .imePadding()
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -142,7 +133,7 @@ fun LoginScreen(
 
                     var visible by remember { mutableStateOf(false) }
                     LaunchedEffect(Unit) { visible = true }
-                    
+
                     AnimatedVisibility(
                         visible = visible,
                         enter = fadeIn(animationSpec = tween(1000)) + slideInVertically(animationSpec = tween(1000)) { -20 }
@@ -179,7 +170,7 @@ fun LoginScreen(
                         modifier = Modifier.padding(bottom = 28.dp)
                     )
 
-                    if (lastUsername.isNotEmpty()) {
+                    if (hasRememberedUsername) {
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
@@ -213,22 +204,20 @@ fun LoginScreen(
                                     .background(Color(0xFFFFC107))
                             )
                         }
-                        
-                        Spacer(modifier = Modifier.height(28.dp))
+
+                        Spacer(modifier = Modifier.height(24.dp))
                     } else {
-                        TextField(
+                        OutlinedTextField(
                             value = username,
-                            onValueChange = { username = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .border(1.dp, Color(0xFF144326).copy(alpha = 0.15f), RoundedCornerShape(16.dp)),
-                            label = { 
-                                Text(
-                                    text = "Username", 
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.5.sp
-                                ) 
+                            onValueChange = {
+                                username = it
+                                usernameError = null
                             },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Username", fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp) },
+                            placeholder = { Text("Enter your username", color = Color(0xFFA5B1C2)) },
+                            isError = usernameError != null,
+                            supportingText = usernameError?.let { { Text(it, color = Color(0xFFC93030), fontSize = 12.sp) } },
                             shape = RoundedCornerShape(16.dp),
                             singleLine = true,
                             colors = TextFieldDefaults.colors(
@@ -240,24 +229,23 @@ fun LoginScreen(
                                 unfocusedLabelColor = Color(0xFFA5B1C2),
                                 cursorColor = Color(0xFF144326)
                             ),
-                            textStyle = TextStyle(color = Color(0xFF0A1F44), fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                            textStyle = TextStyle(color = Color(0xFF0A1F44), fontSize = 16.sp, fontWeight = FontWeight.Medium),
+                            keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Next)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                     }
 
-                    TextField(
+                    OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, Color(0xFF144326).copy(alpha = 0.15f), RoundedCornerShape(16.dp)),
-                        label = { 
-                            Text(
-                                text = "Password", 
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp
-                            ) 
+                        onValueChange = {
+                            password = it
+                            passwordError = null
                         },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Password", fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp) },
+                        placeholder = { Text("Enter your password", color = Color(0xFFA5B1C2)) },
+                        isError = passwordError != null,
+                        supportingText = passwordError?.let { { Text(it, color = Color(0xFFC93030), fontSize = 12.sp) } },
                         shape = RoundedCornerShape(16.dp),
                         singleLine = true,
                         visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -265,8 +253,8 @@ fun LoginScreen(
                             IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
                                 Icon(
                                     imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = null,
-                                    tint = Color(0xFF144326)
+                                    contentDescription = if (isPasswordVisible) "Hide password" else "Show password",
+                                    tint = if (isPasswordVisible) Color(0xFF144326) else Color(0xFFA5B1C2)
                                 )
                             }
                         },
@@ -279,7 +267,9 @@ fun LoginScreen(
                             unfocusedLabelColor = Color(0xFFA5B1C2),
                             cursorColor = Color(0xFF144326)
                         ),
-                        textStyle = TextStyle(color = Color(0xFF0A1F44), fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                        textStyle = TextStyle(color = Color(0xFF0A1F44), fontSize = 16.sp, fontWeight = FontWeight.Medium),
+                        keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -289,7 +279,17 @@ fun LoginScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Button(
-                            onClick = { onLogin(username, password) },
+                            onClick = {
+                                val u = username.trim()
+                                val p = password
+
+                                usernameError = if (u.isEmpty()) "Username is required" else null
+                                passwordError = if (p.isEmpty()) "Password is required" else null
+
+                                if (usernameError == null && passwordError == null) {
+                                    onLogin(u, p)
+                                }
+                            },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(60.dp),
@@ -300,19 +300,31 @@ fun LoginScreen(
                             ),
                             enabled = !isLoading
                         ) {
-                            if (isLoading) {
-                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                            } else {
-                                Text(
-                                    text = "Log In", 
-                                    fontSize = 18.sp, 
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
+                            AnimatedContent(
+                                targetState = isLoading,
+                                transitionSpec = {
+                                    fadeIn(tween(200)) togetherWith fadeOut(tween(200))
+                                },
+                                label = "buttonContent"
+                            ) { loading ->
+                                if (loading) {
+                                    CircularProgressIndicator(
+                                        color = Color.White,
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text(
+                                        text = "Log In",
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
                             }
                         }
 
-                        if (isBiometricAvailable) {
+                        if (isBiometricAvailable && hasRememberedUsername) {
                             Spacer(modifier = Modifier.width(14.dp))
                             Surface(
                                 onClick = onBiometricLogin,
@@ -334,22 +346,48 @@ fun LoginScreen(
                     }
 
                     errorMessage?.let {
-                        Text(
-                            text = it,
-                            color = Color(0xFFC93030),
-                            fontSize = 13.sp,
-                            modifier = Modifier.padding(top = 16.dp)
-                        )
+                        AnimatedVisibility(visible = true, enter = fadeIn() + slideInVertically { it }) {
+                            Surface(
+                                color = Color(0xFFFFF0F0),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.padding(top = 16.dp)
+                            ) {
+                                Text(
+                                    text = it,
+                                    color = Color(0xFFC93030),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                                )
+                            }
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(28.dp))
-
-                    Text(
-                        text = "Authorized users only.",
-                        color = Color(0xFF7A869A),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    if (!hasRememberedUsername) {
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(modifier = Modifier.weight(1f).height(1.dp).background(Color(0xFFE0E0E0)))
+                            Text(
+                                text = "   Authorized users only   ",
+                                color = Color(0xFF7A869A),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Box(modifier = Modifier.weight(1f).height(1.dp).background(Color(0xFFE0E0E0)))
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.height(28.dp))
+                        Text(
+                            text = "Authorized users only.",
+                            color = Color(0xFF7A869A),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }

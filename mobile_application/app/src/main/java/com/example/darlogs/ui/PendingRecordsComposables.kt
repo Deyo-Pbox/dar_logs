@@ -2,6 +2,9 @@ package com.example.darlogs.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -11,6 +14,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
@@ -37,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.darlogs.R
 import com.example.darlogs.ui.theme.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterialApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -54,27 +59,41 @@ fun PendingRecordsScreen(
 ) {
     var searchQuery by remember { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
-    val filteredRecords = remember(records, searchQuery) {
-        records.filter { record ->
-            searchQuery.isBlank() || listOf(
-                record.claimant,
-                record.titleNo,
-                record.location,
-                record.municipality
-            ).any { it.contains(searchQuery, ignoreCase = true) }
+    val filteredRecords by remember(records, searchQuery) {
+        derivedStateOf {
+            records.filter { record ->
+                searchQuery.isBlank() || listOf(
+                    record.claimant,
+                    record.titleNo,
+                    record.location,
+                    record.municipality
+                ).any { it.contains(searchQuery, ignoreCase = true) }
+            }
         }
     }
 
-    var currentPage by remember { mutableStateOf(1) }
+    var currentPage by remember { mutableIntStateOf(1) }
     val pageSize = 10
-    val totalPages = remember(filteredRecords) { maxOf(1, (filteredRecords.size + pageSize - 1) / pageSize) }
-    val pagedRecords = remember(filteredRecords, currentPage) {
-        filteredRecords.drop((currentPage - 1) * pageSize).take(pageSize)
+    val totalPages by remember { derivedStateOf { maxOf(1, (filteredRecords.size + pageSize - 1) / pageSize) } }
+    val pagedRecords by remember(filteredRecords, currentPage) {
+        derivedStateOf {
+            filteredRecords.drop((currentPage - 1) * pageSize).take(pageSize)
+        }
     }
 
     LaunchedEffect(searchQuery) {
         currentPage = 1
+    }
+
+    LaunchedEffect(totalPages) {
+        if (currentPage > totalPages) currentPage = totalPages
+    }
+
+    val showScrollToTop by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 2 }
     }
 
     val bgColor = if (useLightMode) BackgroundLight else BackgroundDark
@@ -128,6 +147,7 @@ fun PendingRecordsScreen(
             ) {}
 
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 110.dp)
@@ -192,24 +212,32 @@ fun PendingRecordsScreen(
                     }
                 }
 
-                if (isLoading) {
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = BrandGreen)
-                        }
+                if (isLoading && records.isEmpty()) {
+                    items(6, key = { "sk_$it" }) {
+                        ShimmerRecordCard(useLightMode = useLightMode)
                     }
                 } else if (filteredRecords.isEmpty()) {
                     item {
-                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                            Text("No pending records found", color = mutedTextColor)
-                        }
-                    }
-                } else {
-                    items(pagedRecords) { record ->
-                        PendingRecordCard(
-                            record = record,
+                        EmptyStateView(
+                            icon = Icons.Default.HourglassEmpty,
+                            title = "No pending records",
+                            subtitle = "All caught up! Pending records will appear here.",
                             useLightMode = useLightMode
                         )
+                    }
+                } else {
+                    val indexedRecords = pagedRecords.withIndex().toList()
+                    items(
+                        count = indexedRecords.size,
+                        key = { idx -> indexedRecords[idx].value.id }
+                    ) { idx ->
+                        val (index, record) = indexedRecords[idx]
+                        StaggeredAnimatedItem(index = index) {
+                            PendingRecordCard(
+                                record = record,
+                                useLightMode = useLightMode
+                            )
+                        }
                     }
                 }
             }
@@ -221,6 +249,29 @@ fun PendingRecordsScreen(
                 backgroundColor = surfaceColor,
                 contentColor = BrandGreen
             )
+
+            AnimatedVisibility(
+                visible = showScrollToTop,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 20.dp, bottom = 100.dp),
+                enter = scaleIn(animationSpec = tween(300)),
+                exit = scaleOut(animationSpec = tween(200))
+            ) {
+                FloatingActionButton(
+                    onClick = {
+                        scope.launch {
+                            listState.animateScrollToItem(0)
+                        }
+                    },
+                    containerColor = BrandGreen,
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.size(42.dp)
+                ) {
+                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Scroll to top")
+                }
+            }
         }
     }
 }

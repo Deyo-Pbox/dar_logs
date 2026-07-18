@@ -4,12 +4,15 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.LinearLayout
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.view.WindowCompat
@@ -17,13 +20,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import com.example.darlogs.ui.CustomBottomNavigation
 import com.example.darlogs.ui.NavItem
-import com.example.darlogs.ui.theme.BackgroundDark
-import com.example.darlogs.ui.theme.BackgroundLight
-import com.example.darlogs.ui.theme.DarDarkColorScheme
-import com.example.darlogs.ui.theme.DarLightColorScheme
-import com.example.darlogs.ui.theme.ThemeManager
-
-import com.example.darlogs.ui.theme.NavigationBarUnderlineLight
+import com.example.darlogs.ui.theme.*
 
 class DashboardActivity : AppCompatActivity() {
     private val navigationStack = ArrayDeque<Int>()
@@ -31,42 +28,24 @@ class DashboardActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         ApiClient.initialize()
         ThemeManager.initialize(this)
-        
-        // Trigger initial data load once
+
         ViewModelProvider(this)[MainViewModel::class.java].refreshAll()
-        
-        // Edge-to-edge support
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        
+
         setContentView(R.layout.activity_dashboard)
 
         val mainLayout = findViewById<LinearLayout>(R.id.mainDashboardLayout)
         val bottomNavCompose = findViewById<ComposeView>(R.id.bottomNavCompose)
-        
+
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+
         bottomNavCompose.setContent {
             val useLightMode = ThemeManager.useLightMode
-            
-            // Sync Android View background and System Bars with Compose Theme
-            LaunchedEffect(useLightMode) {
-                val appBgColor = if (useLightMode) BackgroundLight.toArgb() else BackgroundDark.toArgb()
-                val navUnderlineColor = if (useLightMode) NavigationBarUnderlineLight.toArgb() else BackgroundDark.toArgb()
-                
-                // Update all container backgrounds
-                // We set mainLayout to the footer color so the area under the nav bar matches
-                if (useLightMode) {
-                    mainLayout?.setBackgroundResource(R.drawable.light_mode_nav_area_bg)
-                } else {
-                    mainLayout?.setBackgroundColor(navUnderlineColor)
-                }
-                findViewById<View>(R.id.fragmentContainer)?.setBackgroundColor(appBgColor)
-                
-                // Update System Bar colors
-                window.navigationBarColor = android.graphics.Color.TRANSPARENT
-                window.statusBarColor = android.graphics.Color.TRANSPARENT
-                
-                // Set system bar icons color
+
+            SideEffect {
                 val controller = WindowCompat.getInsetsController(window, window.decorView)
                 controller.isAppearanceLightStatusBars = useLightMode
                 controller.isAppearanceLightNavigationBars = useLightMode

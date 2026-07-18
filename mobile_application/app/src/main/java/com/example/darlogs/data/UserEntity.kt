@@ -2,9 +2,13 @@ package com.example.darlogs.data
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "users")
+@Entity(
+    tableName = "users",
+    indices = [Index(value = ["username"])]
+)
 data class UserEntity(
     @PrimaryKey val id: Int,
     val username: String,

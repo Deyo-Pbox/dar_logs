@@ -2,6 +2,11 @@ package com.example.darlogs.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -13,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -45,8 +51,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.darlogs.R
 import com.example.darlogs.ui.theme.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import kotlinx.coroutines.launch
 
 // Data models
+@androidx.compose.runtime.Stable
 data class RecordItem(
     val id: Int,
     val municipality: String,
@@ -66,6 +75,7 @@ data class RecordItem(
     val updatedBy: String
 )
 
+@androidx.compose.runtime.Stable
 data class DashboardStats(
     val activeRecords: Int = 0,
     val archivedRecords: Int = 0,
@@ -74,16 +84,19 @@ data class DashboardStats(
     val activeUsers: Int = 0
 )
 
+@androidx.compose.runtime.Stable
 data class MunicipalityOption(
     val value: String,
     val label: String
 )
 
+@androidx.compose.runtime.Stable
 data class RouteToUserOption(
     val id: Int,
     val label: String
 )
 
+@androidx.compose.runtime.Stable
 data class NotificationItem(
     val id: Int,
     val type: String,
@@ -95,6 +108,7 @@ data class NotificationItem(
     val createdAt: String
 )
 
+@androidx.compose.runtime.Stable
 data class NewRecordInput(
     val id: Int? = null,
     val municipality: String,
@@ -139,6 +153,8 @@ fun DashboardScreen(
     var selectedMunicipality by remember { mutableStateOf("All") }
     var showAllMunicipalitiesSheet by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
     val quickFilters = remember(municipalityCatalog, selectedMunicipality) {
         val selectedOption = municipalityCatalog.firstOrNull { it.value == selectedMunicipality }
@@ -157,34 +173,42 @@ fun DashboardScreen(
         }
     }
 
-    val filteredRecords = remember(records, selectedMunicipality, searchQuery) {
-        records.filter { record ->
-            val matchesMunicipality = selectedMunicipality == "All" || record.municipality.equals(selectedMunicipality, ignoreCase = true)
-            val matchesQuery = searchQuery.isBlank() || listOf(
-                record.claimant,
-                record.titleNo,
-                record.location,
-                record.municipality
-            ).any { it.contains(searchQuery, ignoreCase = true) }
-            matchesMunicipality && matchesQuery
+    val filteredRecords by remember(records, selectedMunicipality, searchQuery) {
+        derivedStateOf {
+            records.filter { record ->
+                val matchesMunicipality = selectedMunicipality == "All" || record.municipality.equals(selectedMunicipality, ignoreCase = true)
+                val matchesQuery = searchQuery.isBlank() || listOf(
+                    record.claimant,
+                    record.titleNo,
+                    record.location,
+                    record.municipality
+                ).any { it.contains(searchQuery, ignoreCase = true) }
+                matchesMunicipality && matchesQuery
+            }
         }
     }
 
     var currentPage by remember { mutableIntStateOf(1) }
     val pageSize = 10
-    val totalPages = remember(filteredRecords) { maxOf(1, (filteredRecords.size + pageSize - 1) / pageSize) }
-    val pagedRecords = remember(filteredRecords, currentPage) {
-        filteredRecords.drop((currentPage - 1) * pageSize).take(pageSize)
+    val totalPages by remember { derivedStateOf { maxOf(1, (filteredRecords.size + pageSize - 1) / pageSize) } }
+    val pagedRecords by remember(filteredRecords, currentPage) {
+        derivedStateOf {
+            filteredRecords.drop((currentPage - 1) * pageSize).take(pageSize)
+        }
     }
 
     LaunchedEffect(searchQuery, selectedMunicipality) {
         currentPage = 1
     }
 
-    LaunchedEffect(filteredRecords.size) {
+    LaunchedEffect(totalPages) {
         if (currentPage > totalPages) {
             currentPage = totalPages
         }
+    }
+
+    val showScrollToTop by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 3 }
     }
 
     val bgColor = if (useLightMode) BackgroundLight else BackgroundDark
@@ -198,7 +222,7 @@ fun DashboardScreen(
     val pullRefreshState = rememberPullRefreshState(isLoading, onRefresh = onSyncRecords)
     var showAddRecordModal by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var recordToDelete by remember { mutableStateOf<RecordItem?>(null) }
     var addModalError by remember { mutableStateOf<String?>(null) }
@@ -260,6 +284,26 @@ fun DashboardScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
 
         floatingActionButton = {
+            AnimatedVisibility(
+                visible = showScrollToTop,
+                enter = scaleIn(animationSpec = tween(300)),
+                exit = scaleOut(animationSpec = tween(200))
+            ) {
+                FloatingActionButton(
+                    onClick = {
+                        scope.launch {
+                            listState.animateScrollToItem(0)
+                        }
+                    },
+                    containerColor = BrandGreen,
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Scroll to top")
+                }
+            }
+
             FloatingActionButton(
                 onClick = {
                     addModalError = null
@@ -320,6 +364,7 @@ fun DashboardScreen(
             ) {}
 
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -429,26 +474,34 @@ fun DashboardScreen(
                     }
                 }
 
-                if (isLoading) {
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = BrandGreen)
-                        }
+                if (isLoading && records.isEmpty()) {
+                    items(6, key = { "skeleton_$it" }) {
+                        ShimmerRecordCard(useLightMode = useLightMode)
                     }
                 } else if (filteredRecords.isEmpty()) {
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                            Text("No active records", color = mutedTextColor)
-                        }
-                    }
-                } else {
-                    items(pagedRecords) { record ->
-                        RecordCardExpanded(
-                            record = record,
-                            onClick = { openEditRecord(record) },
-                            onDelete = { recordToDelete = record; showDeleteConfirm = true },
+                    item(key = "empty_state") {
+                        EmptyStateView(
+                            icon = Icons.Default.Inbox,
+                            title = "No active records",
+                            subtitle = if (searchQuery.isNotEmpty() || selectedMunicipality != "All") "Try adjusting your filters" else "Tap + to add your first record",
                             useLightMode = useLightMode
                         )
+                    }
+                } else {
+                    val indexedRecords = pagedRecords.withIndex().toList()
+                    items(
+                        count = indexedRecords.size,
+                        key = { idx -> indexedRecords[idx].value.id }
+                    ) { idx ->
+                        val (index, record) = indexedRecords[idx]
+                        StaggeredAnimatedItem(index = index) {
+                            RecordCardExpanded(
+                                record = record,
+                                onClick = { openEditRecord(record) },
+                                onDelete = { recordToDelete = record; showDeleteConfirm = true },
+                                useLightMode = useLightMode
+                            )
+                        }
                     }
                 }
             }

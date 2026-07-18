@@ -7,6 +7,11 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.*
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -21,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -33,6 +39,7 @@ import androidx.fragment.app.FragmentActivity
 import com.example.darlogs.R
 import com.example.darlogs.ui.theme.*
 import com.example.darlogs.utils.NetworkUtils
+import kotlinx.coroutines.delay
 
 private fun getUniqueHardwareId(context: Context): String = 
     android.provider.Settings.Secure.getString(context.contentResolver, android.provider.Settings.Secure.ANDROID_ID)
@@ -681,5 +688,135 @@ fun PaginationControls(
                 )
             }
         }
+    }
+}
+
+@Composable
+fun ShimmerRecordCard(useLightMode: Boolean) {
+    val shimmer = rememberInfiniteTransition(label = "shimmer")
+    val shimmerAlpha by shimmer.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.7f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shimmerAlpha"
+    )
+    val shimmerColor = if (useLightMode) {
+        Color(0xFFDCE3DE).copy(alpha = shimmerAlpha)
+    } else {
+        BrandGreen.copy(alpha = shimmerAlpha * 0.3f)
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(90.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (useLightMode) SurfaceLight.copy(
+                alpha = 0.72f
+            ) else SurfaceDark.copy(alpha = 0.72f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.5f)
+                    .height(14.dp)
+                    .background(shimmerColor, RoundedCornerShape(4.dp))
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .height(11.dp)
+                    .background(shimmerColor, RoundedCornerShape(4.dp))
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(11.dp)
+                        .background(shimmerColor, RoundedCornerShape(4.dp))
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(11.dp)
+                        .background(shimmerColor, RoundedCornerShape(4.dp))
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyStateView(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    useLightMode: Boolean
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(56.dp),
+            tint = if (useLightMode) TextMutedLight.copy(alpha = 0.5f) else TextMuted.copy(
+                alpha = 0.4f
+            )
+        )
+        Text(
+            text = title,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (useLightMode) TextDarkLight else TextLight
+        )
+        Text(
+            text = subtitle,
+            fontSize = 13.sp,
+            color = if (useLightMode) TextMutedLight else TextMuted
+        )
+    }
+}
+
+@Composable
+fun StaggeredAnimatedItem(
+    index: Int,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val animationDelay = (index * 60).coerceAtMost(400)
+    var visible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(animationDelay.toLong())
+        visible = true
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = fadeIn(animationSpec = tween(400, delayMillis = 0)) +
+                slideInVertically(
+                    animationSpec = tween(400, easing = FastOutSlowInEasing),
+                    initialOffsetY = { fullHeight -> fullHeight / 4 }
+                )
+    ) {
+        content()
     }
 }
