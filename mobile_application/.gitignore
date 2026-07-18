@@ -1,0 +1,39 @@
+# Built application files
+*.apk
+*.ap_
+*.aab
+*.dex
+
+# Build outputs
+/build/
+/app/build/
+
+# Gradle caches
+.gradle/
+.kotlin/
+
+# IDE files
+.idea/workspace.xml
+.idea/caches/
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+*.iml
+
+# Local configuration
+local.properties
+
+# Node artifacts
+app/node_modules/
+app/package.json
+app/package-lock.json
+
+# Build logs
+compile_output.txt
+compile_summary.txt
+
+# Database dumps (sensitive)
+*.sql
+
+# OS files
+.DS_Store
+Thumbs.db
