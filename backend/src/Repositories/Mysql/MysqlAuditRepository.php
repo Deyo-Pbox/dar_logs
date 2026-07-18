@@ -58,12 +58,6 @@ class MysqlAuditRepository implements AuditRepository
     {
         static $checked = false;
         if ($checked) return;
-
-        $stampPath = __DIR__ . '/../../../storage/schema_checked_audit_log';
-        if (file_exists($stampPath) && filemtime($stampPath) > time() - 3600) {
-            $checked = true;
-            return;
-        }
         $checked = true;
 
         $stmt = $this->pdo->query("SHOW COLUMNS FROM audit_log LIKE 'action'");
@@ -93,8 +87,6 @@ class MysqlAuditRepository implements AuditRepository
         if (!isset($existing['idx_audit_record_id'])) {
             $this->pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_record_id (record_id)');
         }
-
-        @touch($stampPath);
     }
 
     private function hydrate(array $row): AuditLog

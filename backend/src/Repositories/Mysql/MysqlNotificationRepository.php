@@ -76,12 +76,6 @@ class MysqlNotificationRepository implements NotificationRepository
     {
         static $checked = false;
         if ($checked) return;
-
-        $stampPath = __DIR__ . '/../../../storage/schema_checked_notifications';
-        if (file_exists($stampPath) && filemtime($stampPath) > time() - 3600) {
-            $checked = true;
-            return;
-        }
         $checked = true;
 
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS notifications (
@@ -128,8 +122,6 @@ class MysqlNotificationRepository implements NotificationRepository
                 $this->pdo->exec($sql);
             }
         }
-
-        @touch($stampPath);
     }
 
     private function hydrate(array $row): Notification

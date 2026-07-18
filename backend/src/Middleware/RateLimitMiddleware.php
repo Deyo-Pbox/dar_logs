@@ -72,13 +72,16 @@ class RateLimitMiddleware implements Middleware
         $path = $this->cachePath($key);
         $dir = dirname($path);
         if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
+            @mkdir($dir, 0755, true);
         }
-        file_put_contents($path, json_encode($entry), LOCK_EX);
+        if (is_dir($dir)) {
+            @file_put_contents($path, json_encode($entry), LOCK_EX);
+        }
     }
 
     private function cachePath(string $key): string
     {
-        return __DIR__ . '/../../storage/ratelimit/' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $key) . '.json';
+        $cacheDir = __DIR__ . '/../../storage/cache';
+        return $cacheDir . '/' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $key) . '.json';
     }
 }

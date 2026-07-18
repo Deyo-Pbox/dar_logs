@@ -299,12 +299,6 @@ class MysqlActivityRepository implements ActivityRepository
     {
         static $checked = false;
         if ($checked) return;
-
-        $stampPath = __DIR__ . '/../../../storage/schema_checked_activity_logs';
-        if (file_exists($stampPath) && filemtime($stampPath) > time() - 3600) {
-            $checked = true;
-            return;
-        }
         $checked = true;
 
         $migrations = [
@@ -354,8 +348,6 @@ class MysqlActivityRepository implements ActivityRepository
             }
             $this->ensureIndexes();
         }
-
-        @touch($stampPath);
     }
 
     private function ensureIndexes(): void
