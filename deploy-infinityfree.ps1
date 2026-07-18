@@ -52,6 +52,39 @@ if (-not $DB_PASS)    {
 $CRED = New-Object System.Net.NetworkCredential($FTP_USER, $FTP_PASS)
 $FTP_BASE = "ftp://${FTP_HOST}:21"
 
+# ---------------------------------------------------------------
+# CHANGE TRACKING
+# ---------------------------------------------------------------
+$DEPLOY_HEAD = "$ROOT\.deploy-head"
+$CURRENT_HEAD = git -C $ROOT rev-parse HEAD 2>$null
+$LAST_DEPLOYED_HEAD = if (Test-Path $DEPLOY_HEAD) { Get-Content $DEPLOY_HEAD -Raw | ForEach-Object { $_.Trim() } } else { "" }
+
+$IS_FIRST_DEPLOY = (-not $LAST_DEPLOYED_HEAD)
+
+if ($IS_FIRST_DEPLOY) {
+    warn "First deployment detected — uploading all backend files"
+    $CHANGED_FILES = @("__FULL_DEPLOY__")
+} elseif ($CURRENT_HEAD -eq $LAST_DEPLOYED_HEAD) {
+    warn "No changes since last deployment (HEAD: $($CURRENT_HEAD.Substring(0,7)))"
+    $skip = Read-Host "   Force full deploy anyway? (y/N)"
+    if ($skip -eq 'y') {
+        $CHANGED_FILES = @("__FULL_DEPLOY__")
+    } else {
+        ok "Nothing to deploy."
+        pause; exit 0
+    }
+} else {
+    $diffOutput = git -C $ROOT diff --name-status $LAST_DEPLOYED_HEAD HEAD -- backend/ 2>&1
+    $CHANGED_FILES = @($diffOutput | Where-Object { $_ -ne '' })
+    $changedCount = $CHANGED_FILES.Count
+    if ($changedCount -eq 0) {
+        warn "No backend changes detected. Only frontend will be uploaded."
+    } else {
+        ok "Backend files changed since last deploy ($($LAST_DEPLOYED_HEAD.Substring(0,7)) -> $($CURRENT_HEAD.Substring(0,7))):"
+        $CHANGED_FILES | ForEach-Object { info "  $_" }
+    }
+}
+
 # Offer to save credentials
 if (-not (Test-Path $CRED_FILE)) {
     $save = Read-Host "`n   Save credentials to .deploy file for future deploys? (Y/n)"
@@ -207,30 +240,9 @@ info "  Name: $DB_NAME"
 info "  User: $DB_USER"
 
 # ---------------------------------------------------------------
-# 2. BUILD REACT FRONTEND
+# 2. INSTALL COMPOSER DEPENDENCIES
 # ---------------------------------------------------------------
-step "Building React frontend"
-$frontendDir = "$SOURCE\..\frontend"
-if (Test-Path "$frontendDir\package.json") {
-    pushd $frontendDir
-    try {
-        info "Installing frontend dependencies..."
-        npm install --silent 2>&1 | Out-Null
-        info "Building..."
-        $buildOutput = npm run build 2>&1 | Out-String
-        $buildOutput -split '\n' | ForEach-Object { if ($_.Trim()) { info $_.Trim() } }
-        ok "Frontend built to backend/public/"
-    } catch {
-        warn "Frontend build failed - try running 'npm run build' in frontend/ manually"
-    } finally { popd }
-} else {
-    warn "frontend/ directory not found - skipping frontend build"
-}
-
-# ---------------------------------------------------------------
-# 3. INSTALL COMPOSER DEPENDENCIES
-# ---------------------------------------------------------------
-step "Installing Composer dependencies"
+step "[2/4] Installing Composer dependencies"
 $composer = Get-Command composer -ErrorAction SilentlyContinue
 if ($composer) {
     pushd $SOURCE
@@ -270,66 +282,183 @@ try {
     pause; exit 1
 }
 
-# ---------------------------------------------------------------
-# 5. CLEAN REMOTE
-# ---------------------------------------------------------------
-step "Cleaning remote /htdocs"
-FtpCleanDir $REMOTE_DIR
-ok "Remote directory cleaned"
-
-# ---------------------------------------------------------------
-# 6. UPLOAD ROOT FILES
-# ---------------------------------------------------------------
-step "Uploading root files"
-$rootFiles = @(
-    '.htaccess', '.user.ini', 'bootstrap.php', 'composer.json', 'composer.lock',
-    'README.md', 'database.sql'
-)
-$totalRoot = $rootFiles.Count; $i = 0
-foreach ($f in $rootFiles) {
-    $i++
-    $src = "$SOURCE\$f"
-    if (Test-Path $src) {
-        Write-Host "   [$i/$totalRoot]" -NoNewline -ForegroundColor DarkGray
-        FtpUpload $src "$REMOTE_DIR/$f"
+function FtpEnsureDir($remotePath) {
+    $parts = $remotePath.Trim('/').Split('/',[StringSplitOptions]::RemoveEmptyEntries)
+    $current = ""
+    foreach ($part in $parts[0..($parts.Count - 2)]) {
+        $current += "/$part"
+        FtpMkdir $current
     }
 }
-
-# Upload .env.production AS .env on the server
-FtpUpload $prodEnvFile "$REMOTE_DIR/.env"
-Write-Host "   UP: .env (production)"
-# Clean up temp file
-Remove-Item $prodEnvFile -ErrorAction SilentlyContinue
-
-ok "Root files uploaded"
+function FtpUploadSingle($localFile, $remotePath) {
+    $dir = Split-Path $remotePath -Parent
+    FtpEnsureDir $dir
+    FtpUpload $localFile $remotePath
+}
 
 # ---------------------------------------------------------------
-# 7. UPLOAD DIRECTORIES (EXCEPT public/)
+# UPLOAD LOGIC — FULL vs INCREMENTAL
 # ---------------------------------------------------------------
-$dirs = 'api','config','includes','routes','src','storage','vendor'
-foreach ($d in $dirs) {
-    $src = "$SOURCE\$d"
-    if (Test-Path $src) {
-        step "Uploading $d/"
-        FtpUploadDir $src "$REMOTE_DIR/$d"
+$IS_INCREMENTAL = ($CHANGED_FILES.Count -gt 0 -and $CHANGED_FILES[0] -ne "__FULL_DEPLOY__")
+
+if (-not $IS_INCREMENTAL) {
+    # --- FULL DEPLOY ---
+    step "Cleaning remote /htdocs"
+    FtpCleanDir $REMOTE_DIR
+    ok "Remote directory cleaned"
+
+    step "Uploading root files"
+    $rootFiles = @(
+        '.htaccess', '.user.ini', 'bootstrap.php', 'composer.json', 'composer.lock',
+        'README.md', 'database.sql'
+    )
+    $totalRoot = $rootFiles.Count; $i = 0
+    foreach ($f in $rootFiles) {
+        $i++
+        $src = "$SOURCE\$f"
+        if (Test-Path $src) {
+            Write-Host "   [$i/$totalRoot]" -NoNewline -ForegroundColor DarkGray
+            FtpUpload $src "$REMOTE_DIR/$f"
+        }
     }
+
+    FtpUpload $prodEnvFile "$REMOTE_DIR/.env"
+    info "  UP: .env (production)"
+    Remove-Item $prodEnvFile -ErrorAction SilentlyContinue
+    ok "Root files uploaded"
+
+    $dirs = 'api','config','includes','routes','src','storage','vendor'
+    foreach ($d in $dirs) {
+        $src = "$SOURCE\$d"
+        if (Test-Path $src) {
+            step "Uploading $d/"
+            FtpUploadDir $src "$REMOTE_DIR/$d"
+        }
+    }
+
+    step "Uploading public/ contents to /htdocs"
+    if (Test-Path "$SOURCE\public") {
+        FtpUploadDir "$SOURCE\public" $REMOTE_DIR
+        ok "Public files deployed to web root"
+    }
+
+    FtpMkdir "$REMOTE_DIR/_setup"
+    FtpUpload "$SOURCE\database.sql" "$REMOTE_DIR/_setup/database.sql"
+    info "Database.sql also uploaded to /_setup/database.sql"
+
+} else {
+    # --- INCREMENTAL DEPLOY ---
+    step "Incremental upload — only changed files"
+
+    $uploadedCount = 0
+    $frontendLoaded = $false
+
+    foreach ($line in $CHANGED_FILES) {
+        if ($line -eq '') { continue }
+        $status = $line[0]
+        $file = $line.Substring(1).Trim()
+        # Map backend/path -> path (strip 'backend/')
+        if ($file -match '^backend/(.+)$') {
+            $relative = $Matches[1]
+        } else {
+            continue
+        }
+
+        if ($status -eq 'D') {
+            # Deleted file — remove from remote
+            info "  DELETE $relative"
+            FtpDelete "$REMOTE_DIR/$relative"
+            continue
+        }
+
+        $localPath = "$ROOT\$file"
+        if (-not (Test-Path $localPath)) {
+            info "  SKIP (deleted locally): $relative"
+            continue
+        }
+
+        # public/ files go directly to /htdocs, not /htdocs/public/
+        if ($relative -match '^public/(.+)$') {
+            $remotePath = "$REMOTE_DIR/$($Matches[1])"
+        } else {
+            $remotePath = "$REMOTE_DIR/$relative"
+        }
+
+        info "  UPLOAD $relative"
+        FtpUploadSingle $localPath $remotePath
+        $uploadedCount++
+
+        # Force full frontend rebuild if any frontend source changed
+        if ($relative -match '^public/assets/') {
+            $frontendLoaded = $true
+        }
+    }
+
+    # Always upload .env (it may have changed even if not in git)
+    FtpEnsureDir $REMOTE_DIR
+    FtpUpload $prodEnvFile "$REMOTE_DIR/.env"
+    info "  UP: .env (production)"
+    Remove-Item $prodEnvFile -ErrorAction SilentlyContinue
+
+    # Database SQL — upload if changed
+    if ($CHANGED_FILES | Where-Object { $_ -match 'backend/database\.sql' } | Select-Object -First 1) {
+        FtpMkdir "$REMOTE_DIR/_setup"
+        FtpUpload "$SOURCE\database.sql" "$REMOTE_DIR/_setup/database.sql"
+        info "  UP: database.sql"
+    }
+
+    ok "Incremental upload complete ($uploadedCount files)"
 }
 
 # ---------------------------------------------------------------
-# 7b. UPLOAD public/ CONTENTS DIRECTLY TO /htdocs (NOT as subdir)
+# FRONTEND (always full upload)
 # ---------------------------------------------------------------
-step "Uploading public/ contents to /htdocs"
-if (Test-Path "$SOURCE\public") {
-    FtpUploadDir "$SOURCE\public" $REMOTE_DIR
-    ok "Public files deployed to web root"
+step "Building & uploading frontend"
+$frontendDir = "$SOURCE\..\frontend"
+if (Test-Path "$frontendDir\package.json") {
+    $previousLoc = Get-Location
+
+    # Build
+    Set-Location $frontendDir
+    try {
+        info "Installing frontend dependencies..."
+        npm install 2>&1 | Out-Null
+        info "Building..."
+        $buildOutput = npm run build 2>&1 | Out-String
+        info "  build complete"
+    } catch {
+        warn "Frontend build failed"
+    }
+
+    Set-Location $previousLoc
+
+    # Upload frontend assets (always full sync of public/)
+    if (Test-Path "$SOURCE\public\assets") {
+        info "Uploading SPA assets..."
+        FtpEnsureDir "$REMOTE_DIR/assets"
+        FtpUploadDir "$SOURCE\public\assets" "$REMOTE_DIR/assets"
+        ok "Frontend assets uploaded"
+    }
+
+    if (Test-Path "$SOURCE\public\index.html") {
+        FtpUploadSingle "$SOURCE\public\index.html" "$REMOTE_DIR/index.html"
+        ok "index.html uploaded"
+    }
+
+    if (Test-Path "$SOURCE\public\vite.svg") {
+        FtpUploadSingle "$SOURCE\public\vite.svg" "$REMOTE_DIR/vite.svg"
+    }
+} else {
+    warn "frontend/ directory not found — skipping frontend"
 }
 
 # ---------------------------------------------------------------
-# 8. UPLOAD database.sql TO A SEPARATE LOCATION FOR PHPMYADMIN
+# SAVE DEPLOY HEAD
 # ---------------------------------------------------------------
-FtpMkdir "$REMOTE_DIR/_setup"
-FtpUpload "$SOURCE\database.sql" "$REMOTE_DIR/_setup/database.sql"
-info "Database.sql also uploaded to /_setup/database.sql"
+if ($CURRENT_HEAD) {
+    [IO.File]::WriteAllText($DEPLOY_HEAD, $CURRENT_HEAD)
+    info "Saved deploy marker: $($CURRENT_HEAD.Substring(0,7))"
+}
 
 # ---------------------------------------------------------------
 # DONE - POST-DEPLOY INSTRUCTIONS

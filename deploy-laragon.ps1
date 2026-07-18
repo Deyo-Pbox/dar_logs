@@ -26,6 +26,22 @@ Write-Host ""
 $deployStart = Get-Date
 
 # ---------------------------------------------------------------
+# CHANGE TRACKING
+# ---------------------------------------------------------------
+$DEPLOY_HEAD = "$ROOT\.deploy-head"
+$CURRENT_HEAD = git -C $ROOT rev-parse HEAD 2>$null
+$LAST_DEPLOYED_HEAD = if (Test-Path $DEPLOY_HEAD) { Get-Content $DEPLOY_HEAD -Raw | ForEach-Object { $_.Trim() } } else { "" }
+
+if ($LAST_DEPLOYED_HEAD -and $CURRENT_HEAD -eq $LAST_DEPLOYED_HEAD) {
+    warn "No changes since last deployment (HEAD: $($CURRENT_HEAD.Substring(0,7)))"
+    $skip = Read-Host "   Deploy anyway? (y/N)"
+    if ($skip -ne 'y') {
+        ok "Skipping deploy."
+        pause; exit 0
+    }
+}
+
+# ---------------------------------------------------------------
 # 1. PREREQUISITES
 # ---------------------------------------------------------------
 step "[1/7] Checking prerequisites"
@@ -283,6 +299,14 @@ else {
 
 # Document root
 info "Document root must be: $DEST\public\"
+
+# ---------------------------------------------------------------
+# SAVE DEPLOY HEAD
+# ---------------------------------------------------------------
+if ($CURRENT_HEAD) {
+    [IO.File]::WriteAllText($DEPLOY_HEAD, $CURRENT_HEAD)
+    info "Saved deploy marker: $($CURRENT_HEAD.Substring(0,7))"
+}
 
 # ---------------------------------------------------------------
 # DONE

@@ -9,6 +9,7 @@ backend/public/assets/
 backend/.env
 backend/.env.production
 .deploy
+.deploy-head
 
 # Logs & cache
 backend/storage/logs/*.log
