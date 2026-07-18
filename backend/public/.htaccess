@@ -1,0 +1,13 @@
+RewriteEngine On
+
+# Pass Authorization header to PHP (CGI/FastCGI strips it)
+RewriteCond %{HTTP:Authorization} ^(.+)$
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
+
+<FilesMatch "\.(env|log|sql)$">
+    Require all denied
+</FilesMatch>

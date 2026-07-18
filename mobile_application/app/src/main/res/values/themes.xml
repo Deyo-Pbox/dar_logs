@@ -1,0 +1,18 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.DARLogsMobile" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#0f5a2f</item>
+        <item name="colorPrimaryVariant">#0b3f21</item>
+        <item name="colorSecondary">#D4AF37</item>
+        <item name="colorSurface">#FFFFFF</item>
+        <item name="colorOnSurface">#0e3d1e</item>
+        <item name="android:windowBackground">#071809</item>
+        <item name="android:statusBarColor">#071809</item>
+        <item name="android:navigationBarColor">#071809</item>
+        <item name="android:forceDarkAllowed">false</item>
+    </style>
+
+    <style name="CircleImage" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+</resources>

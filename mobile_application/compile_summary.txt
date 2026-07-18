@@ -1,0 +1,5 @@
+e: file:///C:/laragon/www/dar_logs/dar_logs_mobile/app/src/main/java/com/example/darlogs/ui/DashboardComposables.kt:305:29 Cannot find a parameter with this name: textColor
+e: file:///C:/laragon/www/dar_logs/dar_logs_mobile/app/src/main/java/com/example/darlogs/ui/DashboardComposables.kt:309:29 Cannot find a parameter with this name: placeholderColor
+[Incubating] Problems report is available at: file:///C:/laragon/www/dar_logs/dar_logs_mobile/build/reports/problems/problems-report.html
+FAILURE: Build failed with an exception.
+BUILD FAILED in 4s

@@ -1,0 +1,19 @@
+<resources>
+    <color name="loginBackground">#071809</color>
+    <color name="loginTitle">#0f3e25</color>
+    <color name="loginText">#122f1d</color>
+    <color name="loginHint">#6d7b6b</color>
+    <color name="brandColor">#1e5f35</color>
+    <color name="brandColorDark">#0e3d1e</color>
+    <color name="mobileBackground">#04110D</color>
+    <color name="mobileBackgroundAccent">#0C261A</color>
+    <color name="bottomNavBackground">#26FFFFFF</color>
+    <color name="bottomNavStroke">#55FFFFFF</color>
+    <color name="bottomNavItemColor">#E8F7E6</color>
+    <color name="bottomNavItemInactive">#98B89A</color>
+    <color name="bottomNavRipple">#33E8F7E6</color>
+    <color name="bottomNavActiveBackground">#00000000</color>
+    <color name="white">#ffffff</color>
+    <color name="cardSurfaceTranslucent">#CC0C261A</color>
+    <color name="cardBackground">#07150e</color>
+</resources>

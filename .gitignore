@@ -1,0 +1,53 @@
+# Dependencies
+backend/vendor/
+frontend/node_modules/
+
+# Build outputs
+backend/public/assets/
+
+# Environment
+backend/.env
+backend/.env.production
+.deploy
+
+# Logs & cache
+backend/storage/logs/*.log
+!backend/storage/logs/.gitkeep
+backend/storage/cache/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python (if any)
+.venv/
+__pycache__/
+*.pyc
+
+# Android / Kotlin
+mobile_application/.gradle/
+mobile_application/.kotlin/
+mobile_application/build/
+mobile_application/app/build/
+mobile_application/app/node_modules/
+mobile_application/local.properties
+mobile_application/*.apk
+mobile_application/*.aab
+
+# CommandCode
+.commandcode/
+
+# Vite
+frontend/dist/
+frontend/dist-ssr/
+*.local
