@@ -33,12 +33,8 @@ $CURRENT_HEAD = git -C $ROOT rev-parse HEAD 2>$null
 $LAST_DEPLOYED_HEAD = if (Test-Path $DEPLOY_HEAD) { Get-Content $DEPLOY_HEAD -Raw | ForEach-Object { $_.Trim() } } else { "" }
 
 if ($LAST_DEPLOYED_HEAD -and $CURRENT_HEAD -eq $LAST_DEPLOYED_HEAD) {
-    warn "No changes since last deployment (HEAD: $($CURRENT_HEAD.Substring(0,7)))"
-    $skip = Read-Host "   Deploy anyway? (y/N)"
-    if ($skip -ne 'y') {
-        ok "Skipping deploy."
-        pause; exit 0
-    }
+    ok "No changes since last deployment (HEAD: $($CURRENT_HEAD.Substring(0,7))) — deploy not needed."
+    pause; exit 0
 }
 
 # ---------------------------------------------------------------

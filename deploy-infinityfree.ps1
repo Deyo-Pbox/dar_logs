@@ -1,4 +1,4 @@
-# deploy-infinityfree.ps1 - DAR Logs deployment to InfinityFree via FTP
+﻿# deploy-infinityfree.ps1 - DAR Logs deployment to InfinityFree via FTP
 # Usage: .\deploy-infinityfree.ps1
 
 $ErrorActionPreference = "Stop"
@@ -62,17 +62,11 @@ $LAST_DEPLOYED_HEAD = if (Test-Path $DEPLOY_HEAD) { Get-Content $DEPLOY_HEAD -Ra
 $IS_FIRST_DEPLOY = (-not $LAST_DEPLOYED_HEAD)
 
 if ($IS_FIRST_DEPLOY) {
-    warn "First deployment detected — uploading all backend files"
+    warn "First deployment detected -- uploading all backend files"
     $CHANGED_FILES = @("__FULL_DEPLOY__")
 } elseif ($CURRENT_HEAD -eq $LAST_DEPLOYED_HEAD) {
-    warn "No changes since last deployment (HEAD: $($CURRENT_HEAD.Substring(0,7)))"
-    $skip = Read-Host "   Force full deploy anyway? (y/N)"
-    if ($skip -eq 'y') {
-        $CHANGED_FILES = @("__FULL_DEPLOY__")
-    } else {
-        ok "Nothing to deploy."
-        pause; exit 0
-    }
+    ok "No changes since last deployment (HEAD: $($CURRENT_HEAD.Substring(0,7))) -- deploy not needed."
+    pause; exit 0
 } else {
     $diffOutput = git -C $ROOT diff --name-status $LAST_DEPLOYED_HEAD HEAD -- backend/ 2>&1
     $CHANGED_FILES = @($diffOutput | Where-Object { $_ -ne '' })
@@ -297,7 +291,7 @@ function FtpUploadSingle($localFile, $remotePath) {
 }
 
 # ---------------------------------------------------------------
-# UPLOAD LOGIC — FULL vs INCREMENTAL
+# UPLOAD LOGIC -- FULL vs INCREMENTAL
 # ---------------------------------------------------------------
 $IS_INCREMENTAL = ($CHANGED_FILES.Count -gt 0 -and $CHANGED_FILES[0] -ne "__FULL_DEPLOY__")
 
@@ -348,7 +342,7 @@ if (-not $IS_INCREMENTAL) {
 
 } else {
     # --- INCREMENTAL DEPLOY ---
-    step "Incremental upload — only changed files"
+    step "Incremental upload -- only changed files"
 
     $uploadedCount = 0
     $frontendLoaded = $false
@@ -365,7 +359,7 @@ if (-not $IS_INCREMENTAL) {
         }
 
         if ($status -eq 'D') {
-            # Deleted file — remove from remote
+            # Deleted file -- remove from remote
             info "  DELETE $relative"
             FtpDelete "$REMOTE_DIR/$relative"
             continue
@@ -400,7 +394,7 @@ if (-not $IS_INCREMENTAL) {
     info "  UP: .env (production)"
     Remove-Item $prodEnvFile -ErrorAction SilentlyContinue
 
-    # Database SQL — upload if changed
+    # Database SQL -- upload if changed
     if ($CHANGED_FILES | Where-Object { $_ -match 'backend/database\.sql' } | Select-Object -First 1) {
         FtpMkdir "$REMOTE_DIR/_setup"
         FtpUpload "$SOURCE\database.sql" "$REMOTE_DIR/_setup/database.sql"
@@ -449,7 +443,7 @@ if (Test-Path "$frontendDir\package.json") {
         FtpUploadSingle "$SOURCE\public\vite.svg" "$REMOTE_DIR/vite.svg"
     }
 } else {
-    warn "frontend/ directory not found — skipping frontend"
+    warn "frontend/ directory not found -- skipping frontend"
 }
 
 # ---------------------------------------------------------------
