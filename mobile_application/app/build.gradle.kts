@@ -40,17 +40,20 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
+            buildConfigField("String", "API_BASE_URL", "\"http://dar-project.infinityfree.me/\"")
         }
         debug {
             isDebuggable = true
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            buildConfigField("String", "API_BASE_URL", "\"http://dar-project.infinityfree.me/\"")
         }
     }
 
     buildFeatures {
         viewBinding = true
         compose = true
+        buildConfig = true
     }
 
     compileOptions {
@@ -96,6 +99,9 @@ dependencies {
 
     // WorkManager
     implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    // Fragment KTX (for activityViewModels)
+    implementation("androidx.fragment:fragment-ktx:1.8.2")
 
     // Bcrypt for offline auth
     implementation("at.favre.lib:bcrypt:0.10.2")

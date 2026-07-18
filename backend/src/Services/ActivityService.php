@@ -7,6 +7,7 @@ namespace DarLogs\Services;
 use DarLogs\Config\AppConfig;
 use DarLogs\Core\Cache;
 use DarLogs\Core\Database;
+use DarLogs\Core\Logger;
 use DarLogs\Exceptions\NotFoundException;
 use DarLogs\Repositories\ActivityRepository;
 use DarLogs\Repositories\AuditRepository;
@@ -290,7 +291,16 @@ class ActivityService
 
     public function getAuditLog(int $limit = 100): array
     {
-        $this->auditRepo->prune((int) AppConfig::get('AUDIT_LOG_CAPACITY', 100));
-        return $this->auditRepo->findAll($limit);
+        try {
+            $this->auditRepo->prune((int) AppConfig::get('AUDIT_LOG_CAPACITY', 100));
+            return $this->auditRepo->findAll($limit);
+        } catch (\Throwable $e) {
+            Logger::error('Audit log fetch failed: ' . $e->getMessage(), [
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            return [];
+        }
     }
 }

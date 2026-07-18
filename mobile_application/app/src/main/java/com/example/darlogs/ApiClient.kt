@@ -14,43 +14,54 @@ import java.net.URL
 object ApiClient {
     private const val TAG = "ApiClient"
 
+    @Volatile
+    private var initialized = false
+
+    @Volatile
+    var authToken: String? = null
+
     fun initialize() {
-        if (CookieHandler.getDefault() == null) {
+        if (initialized) return
+        synchronized(this) {
+            if (initialized) return
             val manager = CookieManager(null, CookiePolicy.ACCEPT_ALL)
             CookieHandler.setDefault(manager)
+            initialized = true
+            Log.i(TAG, "🍪 Cookie manager initialized")
         }
     }
 
-    fun clearCookies() {
-        (CookieHandler.getDefault() as? CookieManager)?.cookieStore?.removeAll()
+    fun isAuthenticated(): Boolean = authToken != null
+
+    fun clearAuth() {
+        Log.i(TAG, "🔒 Auth token cleared")
+        authToken = null
     }
 
-    fun getJson(urlString: String): ApiResponse {
-        return request(resolveApiUrl(urlString), "GET", null)
+    fun setAuth(token: String) {
+        val masked = if (token.length > 10) "${token.substring(0, 6)}...${token.takeLast(4)}" else "***"
+        Log.i(TAG, "🔑 Auth token set: $masked")
+        authToken = token
     }
 
-    fun postJson(urlString: String, payload: String): ApiResponse {
-        return request(resolveApiUrl(urlString), "POST", payload)
-    }
+    fun getJson(urlString: String): ApiResponse =
+        request(resolveApiUrl(urlString), "GET", null)
 
-    fun putJson(urlString: String, payload: String): ApiResponse {
-        return request(resolveApiUrl(urlString), "PUT", payload)
-    }
+    fun postJson(urlString: String, payload: String): ApiResponse =
+        request(resolveApiUrl(urlString), "POST", payload)
 
-    fun deleteJson(urlString: String): ApiResponse {
-        return request(resolveApiUrl(urlString), "DELETE", null)
-    }
+    fun putJson(urlString: String, payload: String): ApiResponse =
+        request(resolveApiUrl(urlString), "PUT", payload)
 
-    fun patchJson(urlString: String, payload: String): ApiResponse {
-        return request(resolveApiUrl(urlString), "PATCH", payload)
-    }
+    fun deleteJson(urlString: String): ApiResponse =
+        request(resolveApiUrl(urlString), "DELETE", null)
+
+    fun patchJson(urlString: String, payload: String): ApiResponse =
+        request(resolveApiUrl(urlString), "PATCH", payload)
 
     private fun resolveApiUrl(urlString: String): String {
-        Log.d(TAG, "Resolving URL: $urlString")
-        if (!isEmulator()) {
-            Log.d(TAG, "Not an emulator, using raw URL")
-            return urlString
-        }
+        Log.d(TAG, "📍 Resolving URL: $urlString | Emulator: ${isEmulator()}")
+        if (!isEmulator()) return urlString
 
         val resolved = urlString
             .replace("192.168.1.6", "10.0.2.2")
@@ -58,9 +69,8 @@ object ApiClient {
             .replace("localhost", "10.0.2.2")
 
         if (resolved != urlString) {
-            Log.d(TAG, "Emulator detected: rewriting API URL to $resolved")
+            Log.i(TAG, "📱 Emulator rewrite: $urlString → $resolved")
         }
-
         return resolved
     }
 
@@ -73,7 +83,6 @@ object ApiClient {
             || Build.MODEL.contains("Android SDK built for x86")
             || Build.MODEL.contains("google_sdk")
             || Build.MODEL.contains("sdk_gphone")
-            || Build.MODEL.contains("sdk")
             || Build.MANUFACTURER.contains("Genymotion")
             || Build.MANUFACTURER.contains("Google") && Build.BRAND.startsWith("google")
             || Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic")
@@ -81,29 +90,30 @@ object ApiClient {
             || Build.HARDWARE.contains("ranchu")
             || Build.PRODUCT.contains("sdk_google")
             || Build.PRODUCT.contains("google_sdk")
-            || Build.PRODUCT.contains("sdk")
             || Build.PRODUCT.contains("sdk_x86")
             || Build.PRODUCT.contains("vbox86p")
             || Build.HOST.contains("android")
     }
 
     private fun request(urlString: String, method: String, payload: String?): ApiResponse {
+        val startTime = System.currentTimeMillis()
+        Log.i(TAG, "⬆️ REQUEST $method $urlString")
+        Log.d(TAG, "   Auth: ${if (authToken != null) "✅ present" else "❌ none"}")
+        if (payload != null && payload.isNotEmpty()) {
+            val preview = if (payload.length > 300) payload.take(300) + "...[truncated]" else payload
+            Log.d(TAG, "   Body: $preview")
+        }
+
         return try {
-            // Log the exact URL and method for debugging network issues
-            Log.d(TAG, "Requesting URL: $urlString Method: $method")
-            if (payload != null) {
-                val preview = if (payload.length > 200) payload.substring(0, 200) + "...[truncated]" else payload
-                Log.d(TAG, "Payload preview: $preview")
-            }
             val url = URL(urlString)
             val connection = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = method
                 setRequestProperty("Accept", "application/json, text/plain, */*")
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                // Critical: Use the exact same User-Agent as the WebView bypass
                 setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
-                
-                // If we have cookies from the handshake, use them
+                authToken?.let { setRequestProperty("Authorization", "Bearer $it") }
+
+                // Forward InfinityFree anti-bot cookies
                 android.webkit.CookieManager.getInstance().getCookie(urlString)?.let { cookies ->
                     setRequestProperty("Cookie", cookies)
                 }
@@ -116,44 +126,73 @@ object ApiClient {
                 }
             }
 
-            if (payload != null) {
+            if (payload != null && payload.isNotEmpty()) {
                 connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
             }
 
             val responseCode = connection.responseCode
-            Log.d(TAG, "Response Code: $responseCode")
-            
+            val elapsed = System.currentTimeMillis() - startTime
+            Log.i(TAG, "⬇️ RESPONSE $responseCode ${statusLabel(responseCode)} in ${elapsed}ms")
+
             val responseStream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
             val body = responseStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-            
+
+            val bodyPreview = if (body.length > 500) body.take(500) + "...[${body.length} total]" else body
             if (responseCode !in 200..299) {
-                Log.e(TAG, "Error Response Body: $body")
+                Log.w(TAG, "   ⚠️ Error body: $bodyPreview")
+            } else {
+                Log.d(TAG, "   Body preview: $bodyPreview")
             }
 
             val json = try {
-                if (connection.contentType?.contains("application/json") == true || body.trim().startsWith("{")) {
+                if (body.isNotEmpty() && (body.trim().startsWith("{") || body.trim().startsWith("["))) {
                     JSONObject(body)
                 } else {
+                    if (body.isNotEmpty()) Log.w(TAG, "   Response is not JSON: ${
+                        body.take(100)
+                    }")
                     null
                 }
             } catch (ex: JSONException) {
-                Log.e(TAG, "Failed to parse JSON: ${ex.message}")
+                Log.e(TAG, "   ❌ JSON parse failed: ${ex.message}")
                 null
             }
-            val success = responseCode in 200..299 && json != null
-            if (json == null && responseCode in 200..299) {
-                Log.e(TAG, "Success code but invalid JSON. Body: $body")
-            }
             connection.disconnect()
+
+            val success = responseCode in 200..299 && json != null
+            if (!success) {
+                val reason = when {
+                    responseCode !in 200..299 -> "HTTP $responseCode"
+                    json == null -> "Invalid JSON"
+                    else -> "Unknown"
+                }
+                Log.w(TAG, "   ❌ Request failed: $reason")
+            }
+
             ApiResponse(success, responseCode, body, json)
         } catch (ex: IOException) {
-            Log.e(TAG, "Network request failed - IOException: ${ex.javaClass.simpleName}")
-            Log.e(TAG, "Message: ${ex.message}")
-            ApiResponse(false, -1, "Network Error: ${ex.javaClass.simpleName}", null)
+            val elapsed = System.currentTimeMillis() - startTime
+            Log.e(TAG, "❌ NETWORK ERROR after ${elapsed}ms: ${ex.javaClass.simpleName} - ${ex.message}", ex)
+            ApiResponse(false, -1, ex.message ?: "Network Error", null)
         } catch (ex: Exception) {
-            Log.e(TAG, "Request failed - Exception: ${ex.javaClass.simpleName}", ex)
+            Log.e(TAG, "❌ UNEXPECTED ERROR: ${ex.javaClass.simpleName} - ${ex.message}", ex)
             ApiResponse(false, -1, "Error: ${ex.message}", null)
         }
+    }
+
+    private fun statusLabel(code: Int): String = when (code) {
+        200 -> "OK"
+        201 -> "Created"
+        204 -> "No Content"
+        400 -> "Bad Request"
+        401 -> "Unauthorized"
+        403 -> "Forbidden"
+        404 -> "Not Found"
+        409 -> "Conflict"
+        422 -> "Validation Error"
+        429 -> "Rate Limited"
+        500 -> "Server Error"
+        else -> ""
     }
 }
 

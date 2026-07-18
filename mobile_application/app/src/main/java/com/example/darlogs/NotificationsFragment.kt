@@ -29,7 +29,7 @@ class NotificationsFragment : Fragment() {
         emptyState.visibility = View.GONE
 
         Thread {
-            val apiUrl = getString(R.string.notifications_api_url)
+            val apiUrl = com.example.darlogs.data.ApiConfig.notifications
             val response = ApiClient.getJson(apiUrl)
             activity?.runOnUiThread {
                 if (!response.success || response.json == null) {

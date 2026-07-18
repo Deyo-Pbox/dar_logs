@@ -29,7 +29,7 @@ class CompletedRecordsFragment : Fragment() {
         emptyState.visibility = View.GONE
 
         Thread {
-            val apiUrl = getString(R.string.completed_api_url)
+            val apiUrl = "${com.example.darlogs.data.ApiConfig.activities}?work_status=finished"
             val response = ApiClient.getJson(apiUrl)
             activity?.runOnUiThread {
                 if (!response.success || response.json == null) {

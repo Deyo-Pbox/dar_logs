@@ -87,7 +87,7 @@ class AddRecordActivity : AppCompatActivity() {
         }.toString()
 
         Thread {
-            val response = ApiClient.postJson(getString(R.string.records_api_url), requestBody)
+            val response = ApiClient.postJson(com.example.darlogs.data.ApiConfig.activities, requestBody)
             runOnUiThread {
                 if (!response.success || response.json == null) {
                     Toast.makeText(this, "Unable to submit record. Try again.", Toast.LENGTH_LONG).show()

@@ -29,7 +29,7 @@ class ArchiveFragment : Fragment() {
         emptyState.visibility = View.GONE
 
         Thread {
-            val apiUrl = getString(R.string.archive_api_url)
+            val apiUrl = com.example.darlogs.data.ApiConfig.activitiesArchived
             val response = ApiClient.getJson(apiUrl)
             activity?.runOnUiThread {
                 if (!response.success || response.json == null) {

@@ -40,8 +40,8 @@ class DashboardFragment : Fragment() {
         statusView.text = getString(R.string.loading_message)
 
         Thread {
-            val statsResponse = ApiClient.getJson(getString(R.string.dashboard_api_url))
-            val recordsResponse = ApiClient.getJson(getString(R.string.records_api_url))
+            val statsResponse = ApiClient.getJson(com.example.darlogs.data.ApiConfig.dashboardStats)
+            val recordsResponse = ApiClient.getJson(com.example.darlogs.data.ApiConfig.activities)
 
             activity?.runOnUiThread {
                 if (!statsResponse.success || statsResponse.json == null) {

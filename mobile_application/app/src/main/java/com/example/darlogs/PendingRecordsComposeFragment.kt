@@ -8,8 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.fragment.app.Fragment
-import com.example.darlogs.data.LocalSyncWorker
-import com.example.darlogs.data.RecordRepository
+import androidx.fragment.app.activityViewModels
 import com.example.darlogs.ui.PendingRecordsScreen
 import com.example.darlogs.ui.theme.DarDarkColorScheme
 import com.example.darlogs.ui.theme.DarLightColorScheme
@@ -17,12 +16,7 @@ import com.example.darlogs.ui.theme.ThemeManager
 import kotlinx.coroutines.launch
 
 class PendingRecordsComposeFragment : Fragment() {
-    private lateinit var repository: RecordRepository
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        repository = RecordRepository(requireContext())
-    }
+    private val viewModel: MainViewModel by activityViewModels()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -41,18 +35,11 @@ class PendingRecordsComposeFragment : Fragment() {
 
     @Composable
     private fun PendingRecordsContent(useLightMode: Boolean, onToggleLightMode: (Boolean) -> Unit) {
-        val records by repository.activeRecords.collectAsState(initial = emptyList())
+        val records by viewModel.activeRecords.collectAsState()
         var isLoading by remember { mutableStateOf(false) }
         val coroutineScope = rememberCoroutineScope()
         val username = activity?.intent?.getStringExtra("username") ?: "User"
         val isAdmin = activity?.intent?.getBooleanExtra("isAdmin", false) ?: false
-
-        LaunchedEffect(Unit) {
-            isLoading = true
-            repository.refreshAll()
-            isLoading = false
-            LocalSyncWorker.scheduleSync(requireContext())
-        }
 
         PendingRecordsScreen(
             username = username,
@@ -61,9 +48,8 @@ class PendingRecordsComposeFragment : Fragment() {
             onSyncRecords = {
                 coroutineScope.launch {
                     isLoading = true
-                    repository.refreshAll()
+                    viewModel.refreshAll()
                     isLoading = false
-                    LocalSyncWorker.scheduleSync(requireContext())
                 }
             },
             onNotificationsClick = {

@@ -8,23 +8,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.fragment.app.Fragment
-import com.example.darlogs.data.LocalSyncWorker
-import com.example.darlogs.data.RecordRepository
+import androidx.fragment.app.activityViewModels
 import com.example.darlogs.ui.DashboardScreen
-import com.example.darlogs.ui.DashboardStats
-import com.example.darlogs.ui.MunicipalityOption
 import com.example.darlogs.ui.theme.DarDarkColorScheme
 import com.example.darlogs.ui.theme.DarLightColorScheme
 import com.example.darlogs.ui.theme.ThemeManager
 import kotlinx.coroutines.launch
 
 class DashboardComposeFragment : Fragment() {
-    private lateinit var repository: RecordRepository
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        repository = RecordRepository(requireContext())
-    }
+    private val viewModel: MainViewModel by activityViewModels()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -43,44 +35,15 @@ class DashboardComposeFragment : Fragment() {
 
     @Composable
     private fun DashboardContent(useLightMode: Boolean, onToggleLightMode: (Boolean) -> Unit) {
-        val stats by repository.dashboardStats.collectAsState(initial = DashboardStats())
-        val records by repository.activeRecords.collectAsState(initial = emptyList())
-        val routeToUsers by repository.routeToUsers.collectAsState(initial = emptyList())
+        val stats by viewModel.dashboardStats.collectAsState()
+        val records by viewModel.activeRecords.collectAsState()
+        val routeToUsers by viewModel.routeToUsers.collectAsState()
         var isLoading by remember { mutableStateOf(false) }
         val coroutineScope = rememberCoroutineScope()
-        
+
         val intent = activity?.intent
         val serverUsername = intent?.getStringExtra("username") ?: "User"
         val isAdmin = intent?.getBooleanExtra("isAdmin", false) ?: (intent?.getStringExtra("userRole") == "admin")
-
-        LaunchedEffect(Unit) {
-            isLoading = true
-            repository.refreshAll()
-            isLoading = false
-            LocalSyncWorker.scheduleSync(requireContext())
-        }
-
-        val municipalityCatalog = remember {
-            listOf(
-                MunicipalityOption("BOMBON", "Bombon"),
-                MunicipalityOption("CALABANGA", "Calabanga"),
-                MunicipalityOption("CANAMAN", "Canaman"),
-                MunicipalityOption("CARAMOAN", "Caramoan"),
-                MunicipalityOption("GARCHITORENA", "Garchitorena"),
-                MunicipalityOption("GOA", "Goa"),
-                MunicipalityOption("LAGONOY", "Lagonoy"),
-                MunicipalityOption("MAGARAO", "Magarao"),
-                MunicipalityOption("NAGA", "Naga"),
-                MunicipalityOption("OCAMPO", "Ocampo"),
-                MunicipalityOption("PILI", "Pili"),
-                MunicipalityOption("PRESENTACION", "Presentacion"),
-                MunicipalityOption("SAGÑAY", "Sagñay"),
-                MunicipalityOption("SANJOSE", "San Jose"),
-                MunicipalityOption("SIRUMA", "Siruma"),
-                MunicipalityOption("TIGAON", "Tigaon"),
-                MunicipalityOption("TINAMBAC", "Tinambac")
-            )
-        }
 
         DashboardScreen(
             username = serverUsername,
@@ -90,24 +53,21 @@ class DashboardComposeFragment : Fragment() {
             onAddRecord = {},
             onSaveRecord = { newRecord, onComplete ->
                 coroutineScope.launch {
-                    val success = repository.saveRecord(newRecord)
+                    val success = viewModel.saveRecord(newRecord)
                     onComplete(success)
-                    if (success) LocalSyncWorker.scheduleSync(requireContext())
                 }
             },
             onDeleteRecord = { record, onComplete ->
                 coroutineScope.launch {
-                    val success = repository.deleteRecord(record.id)
+                    val success = viewModel.deleteRecord(record.id)
                     onComplete(success, if (success) null else "Failed to delete")
-                    if (success) LocalSyncWorker.scheduleSync(requireContext())
                 }
             },
             onSyncRecords = {
                 coroutineScope.launch {
                     isLoading = true
-                    repository.refreshAll()
+                    viewModel.refreshAll()
                     isLoading = false
-                    LocalSyncWorker.scheduleSync(requireContext())
                 }
             },
             onRecordClick = { _ -> },
@@ -121,7 +81,7 @@ class DashboardComposeFragment : Fragment() {
                 (activity as? DashboardActivity)?.logout()
             },
             isAdmin = isAdmin,
-            municipalityCatalog = municipalityCatalog,
+            municipalityCatalog = viewModel.municipalityCatalog,
             routeToUsers = routeToUsers,
             useLightMode = useLightMode,
             onToggleLightMode = onToggleLightMode

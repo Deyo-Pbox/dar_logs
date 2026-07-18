@@ -3,14 +3,13 @@ package com.example.darlogs.data
 import android.content.Context
 import androidx.work.*
 import com.example.darlogs.ApiClient
-import com.example.darlogs.R
 import java.util.concurrent.TimeUnit
 
 class LocalSyncWorker(appContext: Context, workerParams: WorkerParameters) :
     CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
-        val repository = RecordRepository(applicationContext)
+        val repository = RecordRepository.getInstance(applicationContext)
         val pendingRecords = repository.getPendingSyncRecords()
 
         var hasError = false
@@ -36,8 +35,7 @@ class LocalSyncWorker(appContext: Context, workerParams: WorkerParameters) :
             return true
         }
 
-        val url = "${applicationContext.getString(R.string.records_api_url)}?id=${entity.id}"
-        val response = ApiClient.deleteJson(url)
+        val response = ApiClient.deleteJson(ApiConfig.activity(entity.id!!))
         if (response.success && response.json?.optBoolean("success") == true) {
             AppDatabase.getDatabase(applicationContext).recordDao().deleteRecord(entity)
             return true

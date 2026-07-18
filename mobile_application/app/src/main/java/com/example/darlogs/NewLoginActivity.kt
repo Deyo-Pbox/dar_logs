@@ -11,6 +11,7 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
+import android.util.Log
 import com.example.darlogs.ui.LoginScreen
 import com.example.darlogs.ui.theme.DarDarkColorScheme
 import com.example.darlogs.ui.theme.DarLightColorScheme
@@ -23,6 +24,7 @@ class NewLoginActivity : AppCompatActivity() {
     private val activityScope = CoroutineScope(Dispatchers.Main + Job())
 
     companion object {
+        private const val TAG = "NewLoginActivity"
         private const val PREFS_NAME = "dar_logs_login_prefs"
         private const val KEY_LAST_USERNAME = "last_username"
         private const val KEY_LAST_IS_ADMIN = "last_is_admin"
@@ -46,6 +48,7 @@ class NewLoginActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ApiClient.initialize()
+        ApiClient.clearAuth()
         ThemeManager.initialize(this)
 
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
@@ -111,7 +114,7 @@ class NewLoginActivity : AppCompatActivity() {
         if (!NetworkUtils.isOnline(this)) {
             activityScope.launch {
                 try {
-                    val repository = com.example.darlogs.data.RecordRepository(this@NewLoginActivity)
+                    val repository = com.example.darlogs.data.RecordRepository.getInstance(this@NewLoginActivity)
                     val user = withContext(Dispatchers.IO) {
                         repository.authenticateOffline(username, password)
                     }
@@ -125,7 +128,7 @@ class NewLoginActivity : AppCompatActivity() {
                             .apply()
 
                         withContext(Dispatchers.IO) {
-                            val repository = com.example.darlogs.data.RecordRepository(this@NewLoginActivity)
+                            val repository = com.example.darlogs.data.RecordRepository.getInstance(this@NewLoginActivity)
                             repository.refreshAll()
                         }
                         
@@ -143,6 +146,9 @@ class NewLoginActivity : AppCompatActivity() {
 
         activityScope.launch {
             try {
+                // Solve InfinityFree bot challenge first
+                BotBypass.solveChallenge(this@NewLoginActivity, BuildConfig.API_BASE_URL)
+
                 val result = withContext(Dispatchers.IO) { performLogin(username, password) }
                 if (result.success) {
                     val rememberedUsername = result.username ?: username
@@ -161,7 +167,7 @@ class NewLoginActivity : AppCompatActivity() {
                     )
 
                     withContext(Dispatchers.IO) {
-                        val repository = com.example.darlogs.data.RecordRepository(this@NewLoginActivity)
+                        val repository = com.example.darlogs.data.RecordRepository.getInstance(this@NewLoginActivity)
                         repository.refreshAll()
                     }
 
@@ -280,26 +286,38 @@ class NewLoginActivity : AppCompatActivity() {
 
     private fun performLogin(username: String, password: String): LoginResult {
         return try {
-            val apiUrl = getString(R.string.login_api_url)
+            Log.i(TAG, "🔐 Login attempt for: $username")
             val requestBody = JSONObject().apply {
                 put("username", username)
                 put("password", password)
             }.toString()
 
-            val response = ApiClient.postJson(apiUrl, requestBody)
+            val response = ApiClient.postJson(com.example.darlogs.data.ApiConfig.login, requestBody)
             if (!response.success || response.json == null) {
-                return LoginResult(false, getString(R.string.error_network), null, false, 0)
+                Log.w(TAG, "❌ Login failed - HTTP ${response.responseCode}: ${response.body.take(100)}")
+                val msg = response.json?.optString("message") ?: getString(R.string.error_network)
+                return LoginResult(false, msg, null, false, 0)
             }
 
             val success = response.json.optBoolean("success", false)
             val message = response.json.optString("message", getString(R.string.error_login_failed))
+            val token = if (response.json.has("token") && !response.json.isNull("token"))
+                response.json.getString("token") else null
             val user = response.json.optJSONObject("user")
             val responseUsername = user?.optString("username")
             val isAdmin = user?.optString("role") == "admin"
             val userId = user?.optInt("id", 0) ?: 0
 
+            if (success && token != null) {
+                ApiClient.setAuth(token)
+                Log.i(TAG, "✅ Login success: $responseUsername (admin=$isAdmin, id=$userId)")
+            } else {
+                Log.w(TAG, "❌ Login rejected: success=$success, hasToken=${token != null}, message=$message")
+            }
+
             LoginResult(success, message, responseUsername, isAdmin, userId)
         } catch (ex: Exception) {
+            Log.e(TAG, "❌ Login exception: ${ex.javaClass.simpleName} - ${ex.message}", ex)
             LoginResult(false, getString(R.string.error_network), null, false, 0)
         }
     }

@@ -1,13 +1,6 @@
 <resources>
     <string name="app_name">DAR Logs</string>
-    <string name="login_api_url">https://darlogs.freedev.app/api/login.php</string>
-    <string name="dashboard_api_url">https://darlogs.freedev.app/api/dashboard.php</string>
-    <string name="my_work_logs_api_url">https://darlogs.freedev.app/api/my_work_logs.php</string>
-    <string name="records_api_url">https://darlogs.freedev.app/api/records.php</string>
-    <string name="pending_records_api_url">https://darlogs.freedev.app/api/pending_records.php</string>
-    <string name="notifications_api_url">https://darlogs.freedev.app/api/notifications.php</string>
-    <string name="archive_api_url">https://darlogs.freedev.app/api/archive.php</string>
-    <string name="completed_api_url">https://darlogs.freedev.app/api/completed.php</string>
+    <!-- API URLs: configured via BuildConfig.API_BASE_URL in build.gradle.kts -->
     <string name="error_fill_fields">Enter both username and password.</string>
     <string name="error_login_failed">Login failed. Check your credentials.</string>
     <string name="error_network">Network error. Try again.</string>
@@ -45,7 +38,4 @@
     <string name="manage_accounts_logout">Log out</string>
     <string name="prompt_municipality">Select municipality</string>
     <string name="prompt_status">Select status</string>
-    <string name="route_users_api_url">https://darlogs.freedev.app/api/route_users.php</string>
-    <string name="users_api_url">https://darlogs.freedev.app/api/users.php</string>
-    <string name="audit_api_url">https://darlogs.freedev.app/api/audit.php</string>
 </resources>

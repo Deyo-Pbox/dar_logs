@@ -29,7 +29,7 @@ class PendingRecordsFragment : Fragment() {
         emptyState.visibility = View.GONE
 
         Thread {
-            val apiUrl = getString(R.string.pending_records_api_url)
+            val apiUrl = "${com.example.darlogs.data.ApiConfig.activities}?work_status=not_finished"
             val response = ApiClient.getJson(apiUrl)
             activity?.runOnUiThread {
                 if (!response.success || response.json == null) {

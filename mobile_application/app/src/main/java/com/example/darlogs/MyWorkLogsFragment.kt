@@ -32,7 +32,7 @@ class MyWorkLogsFragment : Fragment() {
         emptyState.visibility = View.GONE
 
         Thread {
-            val apiUrl = getString(R.string.my_work_logs_api_url)
+            val apiUrl = "${com.example.darlogs.data.ApiConfig.activities}?scope=all"
             val response = ApiClient.getJson(apiUrl)
             activity?.runOnUiThread {
                 if (!response.success || response.json == null) {

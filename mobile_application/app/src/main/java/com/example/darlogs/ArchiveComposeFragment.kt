@@ -8,22 +8,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.fragment.app.Fragment
-import com.example.darlogs.data.LocalSyncWorker
-import com.example.darlogs.data.RecordRepository
+import androidx.fragment.app.activityViewModels
 import com.example.darlogs.ui.ArchiveScreen
-import com.example.darlogs.ui.MunicipalityOption
 import com.example.darlogs.ui.theme.DarDarkColorScheme
 import com.example.darlogs.ui.theme.DarLightColorScheme
 import com.example.darlogs.ui.theme.ThemeManager
 import kotlinx.coroutines.launch
 
 class ArchiveComposeFragment : Fragment() {
-    private lateinit var repository: RecordRepository
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        repository = RecordRepository(requireContext())
-    }
+    private val viewModel: MainViewModel by activityViewModels()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -42,40 +35,11 @@ class ArchiveComposeFragment : Fragment() {
 
     @Composable
     private fun ArchiveContent(useLightMode: Boolean, onToggleLightMode: (Boolean) -> Unit) {
-        val records by repository.archivedRecords.collectAsState(initial = emptyList())
+        val records by viewModel.archivedRecords.collectAsState()
         var isLoading by remember { mutableStateOf(false) }
         val coroutineScope = rememberCoroutineScope()
         val username = activity?.intent?.getStringExtra("username") ?: "User"
         val isAdmin = activity?.intent?.getBooleanExtra("isAdmin", false) ?: false
-
-        val municipalityCatalog = remember {
-            listOf(
-                MunicipalityOption("BOMBON", "Bombon"),
-                MunicipalityOption("CALABANGA", "Calabanga"),
-                MunicipalityOption("CANAMAN", "Canaman"),
-                MunicipalityOption("CARAMOAN", "Caramoan"),
-                MunicipalityOption("GARCHITORENA", "Garchitorena"),
-                MunicipalityOption("GOA", "Goa"),
-                MunicipalityOption("LAGONOY", "Lagonoy"),
-                MunicipalityOption("MAGARAO", "Magarao"),
-                MunicipalityOption("NAGA", "Naga"),
-                MunicipalityOption("OCAMPO", "Ocampo"),
-                MunicipalityOption("PILI", "Pili"),
-                MunicipalityOption("PRESENTACION", "Presentacion"),
-                MunicipalityOption("SAGÑAY", "Sagñay"),
-                MunicipalityOption("SANJOSE", "San Jose"),
-                MunicipalityOption("SIRUMA", "Siruma"),
-                MunicipalityOption("TIGAON", "Tigaon"),
-                MunicipalityOption("TINAMBAC", "Tinambac")
-            )
-        }
-
-        LaunchedEffect(Unit) {
-            isLoading = true
-            repository.refreshAll()
-            isLoading = false
-            LocalSyncWorker.scheduleSync(requireContext())
-        }
 
         ArchiveScreen(
             username = username,
@@ -83,24 +47,21 @@ class ArchiveComposeFragment : Fragment() {
             isLoading = isLoading,
             onRestoreRecord = { record, onComplete ->
                 coroutineScope.launch {
-                    val success = repository.restoreRecord(record.id)
+                    val success = viewModel.restoreRecord(record.id)
                     onComplete(success)
-                    if (success) LocalSyncWorker.scheduleSync(requireContext())
                 }
             },
             onDeleteRecord = { record, onComplete ->
                 coroutineScope.launch {
-                    val success = repository.deleteRecord(record.id)
+                    val success = viewModel.deleteRecord(record.id)
                     onComplete(success, if (success) null else "Failed to delete")
-                    if (success) LocalSyncWorker.scheduleSync(requireContext())
                 }
             },
             onSyncRecords = {
                 coroutineScope.launch {
                     isLoading = true
-                    repository.refreshAll()
+                    viewModel.refreshAll()
                     isLoading = false
-                    LocalSyncWorker.scheduleSync(requireContext())
                 }
             },
             onNotificationsClick = {
@@ -113,7 +74,7 @@ class ArchiveComposeFragment : Fragment() {
                 (activity as? DashboardActivity)?.logout()
             },
             isAdmin = isAdmin,
-            municipalityCatalog = municipalityCatalog,
+            municipalityCatalog = viewModel.municipalityCatalog,
             useLightMode = useLightMode,
             onToggleLightMode = onToggleLightMode
         )

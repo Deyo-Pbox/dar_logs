@@ -60,43 +60,29 @@ class MysqlAuditRepository implements AuditRepository
         if ($checked) return;
         $checked = true;
 
-        $stmt = $this->pdo->query("SHOW COLUMNS FROM audit_log LIKE 'action'");
-        $col = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : false;
-        if ($col) {
-            $type = strtolower((string) ($col['Type'] ?? ''));
-            if (strpos($type, 'archive') === false || strpos($type, 'restore') === false) {
-                $this->pdo->exec("ALTER TABLE audit_log MODIFY action ENUM('add','edit','delete','archive','restore','login','logout') NOT NULL");
-            }
-        }
-
-        $this->ensureIndexes();
-    }
-
-    private function ensureIndexes(): void
-    {
-        $existing = [];
-        $rows = $this->pdo->query('SHOW INDEX FROM audit_log')->fetchAll();
-        foreach ($rows as $row) {
-            $existing[$row['Key_name']] = true;
-        }
-
-        if (!isset($existing['idx_audit_recent_actions'])) {
-            $this->pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_recent_actions (created_at, action)');
-        }
-
-        if (!isset($existing['idx_audit_record_id'])) {
-            $this->pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_record_id (record_id)');
-        }
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS audit_log (
+            id INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id INT(11) UNSIGNED DEFAULT NULL,
+            username VARCHAR(64) NOT NULL DEFAULT 'Unknown',
+            action ENUM('add','edit','delete','archive','restore','login','logout') NOT NULL DEFAULT 'add',
+            table_name VARCHAR(64) NOT NULL DEFAULT '',
+            record_id INT(11) UNSIGNED DEFAULT NULL,
+            details TEXT DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_audit_recent_actions (created_at, action),
+            KEY idx_audit_record_id (record_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
     private function hydrate(array $row): AuditLog
     {
         $log = new AuditLog();
-        $log->id = (int) $row['id'];
+        $log->id = (int) ($row['id'] ?? 0);
         $log->userId = isset($row['user_id']) ? (int) $row['user_id'] : null;
-        $log->username = $row['username'];
-        $log->action = $row['action'];
-        $log->tableName = $row['table_name'];
+        $log->username = (string) ($row['username'] ?? 'Unknown');
+        $log->action = (string) ($row['action'] ?? 'unknown');
+        $log->tableName = (string) ($row['table_name'] ?? '');
         $log->recordId = isset($row['record_id']) ? (int) $row['record_id'] : null;
         $log->details = $row['details'] ?? null;
         $log->createdAt = $row['created_at'] ?? null;

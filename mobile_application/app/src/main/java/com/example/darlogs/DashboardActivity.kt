@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.ViewModelProvider
 import com.example.darlogs.ui.CustomBottomNavigation
 import com.example.darlogs.ui.NavItem
 import com.example.darlogs.ui.theme.BackgroundDark
@@ -32,6 +33,9 @@ class DashboardActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         ApiClient.initialize()
         ThemeManager.initialize(this)
+        
+        // Trigger initial data load once
+        ViewModelProvider(this)[MainViewModel::class.java].refreshAll()
         
         // Edge-to-edge support
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -131,7 +135,7 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     fun logout() {
-        ApiClient.clearCookies()
+        ApiClient.clearAuth()
         val intent = Intent(this, NewLoginActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
         startActivity(intent)

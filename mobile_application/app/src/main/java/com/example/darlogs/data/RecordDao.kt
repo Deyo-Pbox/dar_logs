@@ -75,6 +75,9 @@ interface RecordDao {
     @Query("SELECT * FROM users WHERE username = :username LIMIT 1")
     suspend fun getUserByUsername(username: String): UserEntity?
 
+    @Query("SELECT * FROM users ORDER BY username ASC")
+    fun getAllUsers(): Flow<List<UserEntity>>
+
     @Query("DELETE FROM users")
     suspend fun clearUsers()
 
